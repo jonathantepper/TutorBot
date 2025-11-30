@@ -171,7 +171,7 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             };
         }
 
-        let db, auth, userId, interviewData, transcriptDocRef; 
+        let db, auth, userId, interviewData, transcriptDocRef, functionsBaseUrl; 
         let transcript = []; 
         let recognition;     
         let isInterviewActive = false;
@@ -352,8 +352,11 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             showTypingIndicator(); 
 
             try {
-                const tokenResponse = await fetch(`https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getGeminiToken`, { method: 'POST' });
-                if (!tokenResponse.ok) throw new Error("Failed to get credentials.");
+                const tokenResponse = await fetch(`${functionsBaseUrl}/getGeminiToken`, { method: 'POST' });
+                if (!tokenResponse.ok) {
+                    const errorText = await tokenResponse.text();
+                    throw new Error(`Failed to get AI credentials. Server responded: ${errorText}`);
+                }
                 const { token } = await tokenResponse.json();
 
                 const genAI = new firebase.GoogleGenerativeAI(token);
@@ -362,13 +365,11 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 const fullPromptContent = `${SYSTEM_PROMPT}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
                 const cleanPrompt = fullPromptContent.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
 
-                // --- API 400 FIX: Explicitly format System Instruction as Content Object ---
                 const systemInstructionObject = {
                     role: "system",
                     parts: [{ text: cleanPrompt }]
                 };
 
-                // --- HISTORY FIX ---
                 let apiHistory = transcript.slice(0, -1).map(entry => ({
                     role: entry.role,
                     parts: [{ text: entry.text }]
@@ -377,7 +378,6 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                     apiHistory.unshift({ role: 'user', parts: [{ text: "I am ready to start." }] });
                 }
 
-                // Pass object, not string
                 const modelWithSystem = genAI.getGenerativeModel({ 
                     model: GEMINI_MODEL, 
                     systemInstruction: systemInstructionObject 
@@ -390,15 +390,14 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 const result = await chatSession.sendMessage(messageToSend);
                 const aiText = result.response.text();
 
-                // REVEAL
                 removeTypingIndicator();
                 addMessageToChat('Prompta', aiText);
                 updateTranscript('model', aiText);
                 
-                // WAIT 2 SECONDS THEN SPEAK (Browser Voice)
+                // --- SWITCHED TO PREMIUM VOICE ---
                 setTimeout(() => {
                     speakText(aiText);
-                }, 2000);
+                }, 500);
 
             } catch (error) {
                 removeTypingIndicator();
@@ -409,25 +408,51 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             }
         }
 
-        function speakText(text) {
-            if(recognition) recognition.stop(); 
-            window.speechSynthesis.cancel(); 
+        // --- NEW PREMIUM VOICE FUNCTION ---
+        async function speakText(text) {
+            if (recognition) recognition.stop();
+            window.speechSynthesis.cancel(); // Stop any browser voices
 
-            const utterance = new SpeechSynthesisUtterance(text);
-            const voices = window.speechSynthesis.getVoices();
-            utterance.voice = voices.find(v => v.name.includes('Natural')) || voices.find(v => v.name.includes('Google US English')) || voices[0];
-            utterance.rate = 1.0;
+            setStatus('speaking');
 
-            utterance.onstart = () => setStatus('speaking');
-            utterance.onend = () => {
-                if (isInterviewActive) {
-                    setStatus('listening');
-                    recognition.start();
-                } else {
-                    setStatus('idle');
-                }
-            };
-            window.speechSynthesis.speak(utterance);
+            try {
+                // Call your Cloud Function to get the premium audio
+                const response = await fetch(`${functionsBaseUrl}/generateSpeech`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (!response.ok) throw new Error("TTS Network Error");
+
+                const data = await response.json();
+
+                // Decode base64 and play
+                const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
+                
+                audio.onended = () => {
+                    if (isInterviewActive) {
+                        setStatus('listening');
+                        recognition.start();
+                    } else {
+                        setStatus('idle');
+                    }
+                };
+
+                audio.play();
+
+            } catch (error) {
+                console.error("Premium Voice Failed:", error);
+                // Fallback to browser voice if premium fails
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onend = () => { 
+                    if (isInterviewActive) {
+                        setStatus('listening');
+                        recognition.start();
+                    }
+                };
+                window.speechSynthesis.speak(utterance);
+            }
         }
 
         async function startLiveSession() {
@@ -512,6 +537,19 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 db = firebase.getFirestore(app);
                 auth = firebase.getAuth(app);
                 
+                functionsBaseUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net`;
+
+                // --- EMULATOR SUITE CONNECTION (FOR LOCAL TESTING) ---
+                if (window.location.hostname === "127.0.0.1") {
+                    console.log("Local testing detected. Connecting to Firebase Emulators.");
+                    const { connectAuthEmulator } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                    const { connectFirestoreEmulator } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                    // Note: The Functions emulator URL is slightly different from the others.
+                    functionsBaseUrl = `http://127.0.0.1:5001/${firebaseConfig.projectId}/us-central1`;
+                    connectAuthEmulator(auth, "http://127.0.0.1:9099");
+                    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+                }
+
                 firebase.onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
@@ -529,9 +567,6 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 if (initialAuthToken) await firebase.signInWithCustomToken(auth, initialAuthToken);
                 
                 initSpeechToText();
-                if (window.speechSynthesis.onvoiceschanged !== undefined) {
-                    window.speechSynthesis.onvoiceschanged = () => console.log("TTS Voices loaded.");
-                }
             } catch (e) {
                 showModal("Error", e.message);
                 hideLoading();
