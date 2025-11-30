@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AInterview: Admin Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, getDocs, doc, deleteDoc, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebase = { initializeApp, getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, getFirestore, collection, query, getDocs, doc, deleteDoc, where, writeBatch };
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-gray-900 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-user-shield text-red-500 text-2xl"></i>
+                    <span class="text-xl font-bold">AInterview Admin</span>
+                </div>
+                <div>
+                    <button id="auth-btn" onclick="handleAuth()" class="text-sm font-medium bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition">Sign In</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <div id="access-denied" class="text-center py-20">
+            <i class="fas fa-lock text-6xl text-gray-400 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800">Admin Access Required</h2>
+            <p class="text-gray-500 mt-2">Please sign in with an authorized administrator account.</p>
+        </div>
+
+        <div id="dashboard" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Teacher Accounts</h2>
+                <button onclick="loadData()" class="text-indigo-600 hover:text-indigo-800">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Teacher List -->
+            <div id="teacher-list" class="space-y-4">
+                <!-- Teachers injected here -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- INITIALIZATION ---
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        // Fallback config for local development.
+        // IMPORTANT: Ensure your Firestore security rules are properly configured to protect your data.
+        if (!firebaseConfig) {
+             firebaseConfig = {
+                apiKey: "AIzaSyAQtJt9GWusgVGWVMYMC_aEyQUdIUS9ae4",
+                authDomain: "tutorbot-184ec.firebaseapp.com",
+                projectId: "tutorbot-184ec",
+                storageBucket: "tutorbot-184ec.appspot.com",
+                messagingSenderId: "666724888666",
+                appId: "1:666724888666:web:003a280426ad97d013e863"
+            };
+        }
+
+        const ADMIN_EMAILS = ["jontepper@gmail.com"]; // Authorized admin emails
+        const appId = 'default-app-id';
+        let db, auth, currentUser;
+
+        async function initApp() {
+            const app = firebase.initializeApp(firebaseConfig);
+            db = firebase.getFirestore(app);
+            auth = firebase.getAuth(app);
+
+            firebase.onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                updateUIForAuthState(user);
+            });
+        }
+
+        // --- AUTHENTICATION & UI ---
+
+        function updateUIForAuthState(user) {
+            const authBtn = document.getElementById('auth-btn');
+            const accessDeniedEl = document.getElementById('access-denied');
+            const dashboardEl = document.getElementById('dashboard');
+
+            if (user) {
+                authBtn.textContent = 'Sign Out';
+                authBtn.onclick = () => firebase.signOut(auth);
+                
+                if (ADMIN_EMAILS.includes(user.email)) {
+                    accessDeniedEl.classList.add('hidden');
+                    dashboardEl.classList.remove('hidden');
+                    loadData();
+                } else {
+                    alert("Access Denied: You are not an authorized administrator.");
+                    firebase.signOut(auth);
+                }
+            } else {
+                accessDeniedEl.classList.remove('hidden');
+                dashboardEl.classList.add('hidden');
+                authBtn.textContent = 'Sign In';
+                authBtn.onclick = handleAuth;
+            }
+        }
+
+        async function handleAuth() {
+            const provider = new firebase.GoogleAuthProvider();
+            try {
+                await firebase.signInWithPopup(auth, provider);
+            } catch (e) {
+                console.error("Authentication Error:", e);
+                alert(e.message);
+            }
+        }
+
+        // --- DATA LOADING ---
+        async function loadData() {
+            const container = document.getElementById('teacher-list');
+            container.innerHTML = '<p class="text-center text-gray-500">Loading system data...</p>';
+
+            try {
+                // Infer teachers by querying all interviews, as there isn't a dedicated "users" collection.
+                const q = firebase.query(firebase.collection(db, `artifacts/${appId}/public/data/interviews`));
+                const snapshot = await firebase.getDocs(q);
+
+                const teachers = {}; // Map: teacherId -> { id, name, email, interviews: [] }
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const tid = data.teacherId;
+                    if (!tid) return; // Skip interviews without a teacherId
+                    
+                    const interviewTimestamp = data.timestamp ? data.timestamp.toDate() : null;
+ 
+                    if (!teachers[tid]) {
+                        teachers[tid] = { 
+                            id: tid, 
+                            name: data.teacherName || "Unknown Teacher", 
+                            interviews: [],
+                            firstActivity: interviewTimestamp
+                        };
+                    } else if (interviewTimestamp && (!teachers[tid].firstActivity || interviewTimestamp < teachers[tid].firstActivity)) {
+                        // If the current interview is older than the stored 'firstActivity', update it.
+                        teachers[tid].firstActivity = interviewTimestamp;
+                    }
+                    teachers[tid].interviews.push({ id: doc.id, ...data });
+                });
+
+                renderTeachers(teachers);
+
+            } catch (e) {
+                console.error("Error loading data:", e);
+                container.innerHTML = `<p class="text-red-500 text-center">Error: ${e.message}</p>`;
+            }
+        }
+
+        // --- UI RENDERING ---
+
+        function renderTeachers(teachersMap) {
+            const container = document.getElementById('teacher-list');
+            container.innerHTML = '';
+            const teachers = Object.values(teachersMap);
+
+            if (teachers.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500">No active teachers found.</p>';
+                return;
+            }
+
+            teachers.forEach(teacher => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden";
+
+                const teacherCreationDate = teacher.firstActivity ? teacher.firstActivity.toLocaleDateString() : 'N/A';
+                
+                let html = `
+                    <div class="p-4 bg-gray-50 flex justify-between items-center border-b border-gray-200">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-900">${teacher.name}</h3>
+                            <p class="text-xs text-gray-500">ID: ${teacher.id} | First Activity: <span class="font-medium">${teacherCreationDate}</span></p>
+                        </div>
+                        <button onclick="deleteTeacher('${teacher.id}')" class="text-red-600 hover:text-red-800 text-sm font-medium px-3 py-1 border border-red-200 rounded hover:bg-red-50 transition">
+                            <i class="fas fa-trash"></i> Delete Teacher
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Interviews Created (${teacher.interviews.length})</h4>
+                        <div class="space-y-2">
+                `;
+
+                teacher.interviews.forEach(interview => {
+                    const interviewDate = interview.timestamp ? new Date(interview.timestamp.toDate()).toLocaleString() : 'N/A';
+                    html += `
+                        <div class="flex items-center justify-between bg-white border border-gray-100 p-3 rounded hover:border-indigo-200 transition">
+                            <div>
+                                <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-mono font-bold px-2 py-0.5 rounded mr-2">${interview.code || interview.id}</span>
+                                <span class="text-gray-800 font-medium text-sm">${interview.title}</span>
+                                <span class="text-gray-400 text-xs ml-2">(${interviewDate})</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button onclick="viewTranscripts('${interview.id}')" class="text-indigo-600 hover:text-indigo-800 text-xs">View Students</button>
+                                <button onclick="deleteInterview('${interview.id}', '${teacher.id}')" class="text-gray-400 hover:text-red-500 text-xs"><i class="fas fa-times"></i></button>
+                            </div>
+                        </div>
+                        <!-- Container for this interview's students (Hidden by default) -->
+                        <div id="students-${interview.id}" class="hidden pl-10 pr-4 py-2 bg-gray-50 text-sm space-y-2 border-l-2 border-indigo-100 ml-4 mb-2">
+                            Loading students...
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+                card.innerHTML = html;
+                container.appendChild(card);
+            });
+        }
+
+        // --- ACTIONS ---
+
+        async function viewTranscripts(interviewId) {
+            const container = document.getElementById(`students-${interviewId}`);
+            if (!container.classList.contains('hidden')) {
+                container.classList.add('hidden'); // Toggle off
+                return;
+            }
+            container.classList.remove('hidden');
+            container.innerHTML = '<i class="fas fa-spinner fa-spin text-gray-400"></i> Loading...';
+
+            try {
+                const q = firebase.query(
+                    firebase.collection(db, `artifacts/${appId}/public/data/interview_transcripts`),
+                    firebase.where("interviewCode", "==", interviewId)
+                );
+                const snapshot = await firebase.getDocs(q);
+
+                if (snapshot.empty) {
+                    container.innerHTML = '<span class="text-gray-400 italic">No student submissions yet.</span>';
+                    return;
+                }
+
+                let html = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : 'N/A';
+                    html += `
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-gray-700">${data.studentName || 'Anonymous'}</span>
+                            <span class="text-xs text-gray-400">${date}</span>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+
+            } catch (e) {
+                console.error(`Error loading transcripts for ${interviewId}:`, e);
+                container.innerHTML = '<span class="text-red-500">Error loading students.</span>';
+            }
+        }
+
+        async function deleteInterview(interviewId, teacherId) {
+            if (!confirm("ADMIN ACTION: Are you sure you want to delete this interview and all its student transcripts?")) return;
+            
+            try {
+                const response = await fetch(`https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/deleteInterviewAndTranscripts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appId, interviewId, teacherId })
+                });
+                if (response.ok) {
+                    alert("Interview deleted successfully.");
+                    loadData(); 
+                } else {
+                    const errorText = await response.text();
+                    alert(`Failed to delete interview: ${errorText}`);
+                }
+            } catch (e) {
+                console.error("Error calling delete function:", e);
+                alert("Error: " + e.message);
+            }
+        }
+
+        async function deleteTeacher(teacherId) {
+            if (!confirm("WARNING: This will delete ALL interviews and transcripts for this teacher. This action cannot be undone. Continue?")) return;
+            
+            try {
+                const q = firebase.query(
+                    firebase.collection(db, `artifacts/${appId}/public/data/interviews`),
+                    firebase.where("teacherId", "==", teacherId)
+                );
+                const snapshot = await firebase.getDocs(q);
+
+                let successCount = 0;
+                const promises = snapshot.docs.map(doc => {
+                    return fetch(`https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/deleteInterviewAndTranscripts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ appId, interviewId: doc.id, teacherId })
+                    }).then(response => {
+                        if (response.ok) successCount++;
+                    }).catch(e => console.error(`Failed to delete interview ${doc.id}:`, e));
+                });
+
+                await Promise.all(promises);
+                
+                alert(`Process complete. Deleted ${successCount} of ${snapshot.docs.length} interviews for this teacher.`);
+                loadData();
+            } catch (e) {
+                console.error("Error deleting teacher data:", e);
+                alert("An error occurred while trying to delete the teacher's data. Check the console for details.");
+            }
+        }
+
+        // --- GLOBAL ASSIGNMENTS ---
+        window.handleAuth = handleAuth;
+        window.viewTranscripts = viewTranscripts;
+        window.deleteInterview = deleteInterview;
+        window.deleteTeacher = deleteTeacher;
+        window.loadData = loadData;
+        window.onload = initApp;
+    </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the user is the owner of the document
+    // (Assumes the document has a field like 'teacherId' or 'uid')
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // 1. Health Check (Keep as is, good for diagnostics)
+    match /healthcheck/{uid} {
+      allow write: if isOwner(uid);
+    }
+
+    // 2. Interviews Collection
+    match /artifacts/{appId}/public/data/interviews/{interviewId} {
+      
+      // READ (get): Allow ANYONE to read a single interview (for students).
+      allow get: if true;
+
+      // READ (list): 
+      // FIX: Use resource.data.teacherId. 
+      // Firestore automatically checks this against your JS .where() clause.
+      allow list: if isAuthenticated() && (
+        resource.data.teacherId == request.auth.uid || isAdmin()
+      );
+
+      // CREATE: Standard check
+      allow create: if isAuthenticated() 
+                    && request.resource.data.teacherId == request.auth.uid;
+
+      // UPDATE: Standard check
+      allow update: if isAuthenticated() 
+                    && resource.data.teacherId == request.auth.uid
+                    && request.resource.data.teacherId == resource.data.teacherId;
+
+      // DELETE: Standard check
+      allow delete: if isAuthenticated() && (
+                      resource.data.teacherId == request.auth.uid || isAdmin()
+                    );
+    }
+
+    // 3. Transcripts Collection (TIGHTENED)
+    // Path: /artifacts/{appId}/public/data/interview_transcripts/{transcriptId}
+    match /artifacts/{appId}/public/data/interview_transcripts/{transcriptId} {
+      
+      // CREATE: Only authenticated users (students) can create.
+      // VALIDATION: Ensure 'studentId' matches their auth UID.
+      allow create: if isAuthenticated() 
+                    && request.resource.data.studentId == request.auth.uid;
+
+      // UPDATE: Allow students to update ONLY their own transcript.
+      // VALIDATION: They cannot change the 'studentId' or 'interviewCode' after creation.
+      allow update: if isAuthenticated() 
+                    && resource.data.studentId == request.auth.uid
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.interviewCode == resource.data.interviewCode;
+
+      // READ: THIS IS THE CRITICAL SECURITY LOGIC.
+      // A student should be able to read their OWN transcript.
+      // A teacher should be able to read transcripts for INTERVIEWS THEY OWN.
+      
+      allow read: if isAuthenticated() && (
+        // Case 1: The user is the student who owns this transcript
+        resource.data.studentId == request.auth.uid 
+        ||
+        // Case 2: The user is the teacher who owns the interview.
+        // We perform a "get()" to look up the parent interview document and check its teacherId.
+        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/interviews/$(resource.data.interviewCode)).data.teacherId == request.auth.uid
+      );
+
+      // DELETE: Generally, we don't want students deleting records. 
+      // Only the teacher (via the 'deleteInterview' cloud function) or admin SDK usually deletes these.
+      // However, if you want to allow teachers to delete individual transcripts from the client 
+      // (e.g., "Delete Submission" button), you need this rule:
+      allow delete: if isAuthenticated() && 
+        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/interviews/$(resource.data.interviewCode)).data.teacherId == request.auth.uid;
+    }
+  }
+}

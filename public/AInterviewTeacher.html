@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AInterview: Teacher Dashboard</title>
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        /* Custom font for a professional look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        /* Modal Scrollbar */
+        .modal-scroll::-webkit-scrollbar { width: 8px; }
+        .modal-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .modal-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    </style>
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs, doc, deleteDoc, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Expose Firebase components globally
+        window.firebase = {
+            initializeApp, getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut,
+            getFirestore, collection, query, where, getDocs, doc, deleteDoc, orderBy, serverTimestamp, setDoc
+        };
+    </script>
+    <!-- Load PDF.js Library for reading PDF content -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-chalkboard-teacher text-indigo-600 text-2xl"></i>
+                    <h1 class="text-xl font-bold text-gray-900">AInterview <span class="text-indigo-600">Teacher</span></h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="user-display" class="text-sm text-gray-600 hidden"></span>
+                    <button id="auth-btn" onclick="handleAuth()" class="text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition">
+                        Sign In
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div id="login-warning" class="text-center mt-20">
+            <i class="fas fa-lock text-6xl text-gray-300 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-900">Teacher Access Only</h2>
+            <p class="text-gray-500 mt-2">Please sign in to manage interviews.</p>
+        </div>
+
+        <div id="dashboard" class="hidden">
+            
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Your Interviews</h2>
+                <button onclick="openCreateModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Create New
+                </button>
+            </div>
+
+            <div id="interview-list" class="flex flex-col gap-3">
+                </div>
+        </div>
+    </main>
+
+    <div id="create-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-900">Create Assessment</h3>
+                <button onclick="closeCreateModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto modal-scroll">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input type="text" id="input-title" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g., Hamlet Act 1">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">PDF Template</label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer" onclick="document.getElementById('pdf-upload').click()">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                            <p class="text-sm text-gray-500" id="file-name-display">Click to upload PDF</p>
+                            <input type="file" id="pdf-upload" accept="application/pdf" class="hidden" onchange="handleFileSelect(this)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button onclick="closeCreateModal()" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg">Cancel</button>
+                <button onclick="saveInterview()" id="save-btn" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="submissions-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="p-6 border-b border-gray-100 bg-indigo-50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-900" id="submission-modal-title">Submissions</h3>
+                    <p class="text-sm text-indigo-600" id="submission-modal-code">Code: ---</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="download-all-btn" class="hidden px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-2 transition">
+                        <i class="fas fa-file-archive"></i> Download All (ZIP)
+                    </button>
+                    <button onclick="closeSubmissionsModal()" class="text-indigo-400 hover:text-indigo-700"><i class="fas fa-times text-xl"></i></button>
+                </div>
+            </div>
+
+            <div id="submissions-list" class="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-3 modal-scroll">
+            </div>
+        </div>
+    </div>
+
+    <div id="transcript-viewer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col h-[80vh]">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                    <h4 class="font-bold text-gray-800" id="viewer-student-name">Student Name</h4>
+                    <p class="text-xs text-gray-500" id="viewer-date">Date</p>
+                </div>
+                <button onclick="closeTranscriptViewer()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div id="transcript-content" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white modal-scroll">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // --- CONFIG ---
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        // If the __firebase_config is not injected (e.g., running locally), use this fallback.
+        if (!firebaseConfig) {
+            console.warn("Using fallback Firebase configuration.");
+            firebaseConfig = {
+                apiKey: "AIzaSyAQtJt9GWusgVGWVMYMC_aEyQUdIUS9ae4",
+                authDomain: "tutorbot-184ec.firebaseapp.com",
+                projectId: "tutorbot-184ec",
+                storageBucket: "tutorbot-184ec.firebasestorage.app",
+                messagingSenderId: "666724888666",
+                appId: "1:666724888666:web:003a280426ad97d013e863"
+            };
+        }
+        
+        const appId = 'default-app-id';
+        let db, auth, currentUser, pdfTextContent = "";
+
+        // --- AUTH & INITIALIZATION ---
+        async function initApp() {
+            const app = firebase.initializeApp(firebaseConfig);
+            db = firebase.getFirestore(app);
+            auth = firebase.getAuth(app);
+
+            firebase.onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) {
+                    document.getElementById('login-warning').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    document.getElementById('user-display').textContent = user.displayName || user.email;
+                    document.getElementById('user-display').classList.remove('hidden');
+                    document.getElementById('auth-btn').textContent = 'Sign Out';
+                    document.getElementById('auth-btn').onclick = () => firebase.signOut(auth);
+                    // Add a small delay to prevent a race condition where currentUser.uid is not yet available.
+                    setTimeout(() => {
+                        loadInterviews();
+                    }, 100);
+                } else {
+                    document.getElementById('login-warning').classList.remove('hidden');
+                    document.getElementById('dashboard').classList.add('hidden');
+                    document.getElementById('user-display').classList.add('hidden');
+                    document.getElementById('auth-btn').textContent = 'Sign In';
+                    document.getElementById('auth-btn').onclick = handleAuth;
+                }
+            });
+        }
+
+        async function handleAuth() {
+            const provider = new firebase.GoogleAuthProvider();
+            try { await firebase.signInWithPopup(auth, provider); } catch (e) { alert(e.message); }
+        }
+
+        // --- INTERVIEW LOGIC (LIST VIEW) ---
+        async function loadInterviews() {
+            const list = document.getElementById('interview-list');
+            list.innerHTML = '<p class="text-gray-500 text-center py-4">Loading interviews...</p>';
+            
+            const q = firebase.query(
+                firebase.collection(db, `artifacts/${appId}/public/data/interviews`),
+                firebase.where("teacherId", "==", currentUser.uid),
+                firebase.orderBy("timestamp", "desc")
+            );
+
+            const snapshot = await firebase.getDocs(q);
+            list.innerHTML = '';
+
+            if (snapshot.empty) {
+                list.innerHTML = `
+                    <div class="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+                        <p class="text-gray-500 mb-2">No interviews created yet.</p>
+                        <button onclick="openCreateModal()" class="text-indigo-600 font-medium hover:underline">Create your first one</button>
+                    </div>`;
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const data = doc.id ? { ...doc.data(), code: doc.id } : doc.data();
+                const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : 'N/A';
+                const safeTitle = data.title.replace(/'/g, "\\'"); // Escape quotes
+                
+                const row = document.createElement('div');
+                row.className = "bg-white p-4 rounded-lg border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 hover:shadow-md transition group";
+                
+                row.innerHTML = `
+                    <div class="flex-1 min-w-0 text-center sm:text-left">
+                        <div class="flex items-center justify-center sm:justify-start gap-3 mb-1">
+                            <h3 class="text-lg font-bold text-gray-900 truncate">${data.title}</h3>
+                            <span class="bg-indigo-100 text-indigo-700 text-xs font-mono font-bold px-2 py-1 rounded">${data.code}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 flex items-center justify-center sm:justify-start gap-1">
+                            <i class="far fa-clock"></i> Created: ${date}
+                        </p>
+                    </div>
+                    
+                    <div class="flex items-center gap-3 opacity-100 sm:opacity-100 transition-opacity">
+                        <button onclick="openSubmissionsList('${data.code}', '${safeTitle}')" 
+                            class="px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 hover:text-indigo-600 transition text-sm flex items-center gap-2">
+                            <i class="fas fa-users"></i> View Submissions
+                        </button>
+                        <button onclick="deleteInterview('${data.code}')" 
+                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete Interview">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        // --- HELPERS & CRUD ---
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 5; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
+        }
+
+        async function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('file-name-display').textContent = file.name;
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                let fullText = "";
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join(" ") + "\n";
+                }
+                pdfTextContent = fullText;
+            } catch (e) { alert("Error reading PDF: " + e.message); }
+        }
+
+        async function saveInterview() {
+            const title = document.getElementById('input-title').value;
+            if (!title || !pdfTextContent) { alert("Please enter a title and upload a valid PDF."); return; }
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true; btn.textContent = "Saving...";
+
+            try {
+                const code = generateCode();
+                await firebase.setDoc(firebase.doc(db, `artifacts/${appId}/public/data/interviews`, code), {
+                    title: title,
+                    curriculumText: pdfTextContent,
+                    teacherId: currentUser.uid,
+                    teacherName: currentUser.displayName,
+                    timestamp: firebase.serverTimestamp()
+                });
+                closeCreateModal();
+                loadInterviews();
+            } catch (e) { console.error(e); alert("Error creating interview."); } 
+            finally { btn.disabled = false; btn.textContent = "Create"; }
+        }
+
+        async function deleteInterview(code) {
+            if (!confirm("Delete this interview and all student transcripts?")) return;
+            try {
+                const response = await fetch(`https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/deleteInterviewAndTranscripts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ appId, interviewId: code, teacherId: currentUser.uid })
+                });
+                if (response.ok) loadInterviews(); else alert("Delete failed.");
+            } catch (e) { console.error(e); alert("Error deleting."); }
+        }
+
+        // --- DOWNLOAD LOGIC (NEW) ---
+        function formatTranscriptText(transcriptArray, studentName, date) {
+            let text = `INTERVIEW TRANSCRIPT\n`;
+            text += `Student: ${studentName}\n`;
+            text += `Date: ${date}\n`;
+            text += `----------------------------------------\n\n`;
+
+            if (!transcriptArray || transcriptArray.length === 0) return text + "(No transcript data recorded)";
+
+            transcriptArray.forEach(turn => {
+                const speaker = turn.role === 'model' ? 'Prompta' : studentName;
+                text += `${speaker}: ${turn.text}\n\n`;
+            });
+            return text;
+        }
+
+        // Download SINGLE
+        function downloadSingleTranscript(transcriptArray, studentName, date) {
+            const text = formatTranscriptText(transcriptArray, studentName, date);
+            const blob = new Blob([text], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const filename = `${studentName.replace(/\s+/g, '_')}_Transcript.txt`;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Download ALL (ZIP)
+        async function downloadAllTranscripts(code, title) {
+            const btn = document.getElementById('download-all-btn');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zipping...';
+            btn.disabled = true;
+
+            try {
+                const q = firebase.query(
+                    firebase.collection(db, `artifacts/${appId}/public/data/interview_transcripts`),
+                    firebase.where("interviewCode", "==", code)
+                );
+                const snapshot = await firebase.getDocs(q);
+                
+                if (snapshot.empty) { alert("No submissions to download."); return; }
+
+                const zip = new JSZip();
+                const folder = zip.folder(`${title.replace(/\s+/g, '_')}_Submissions`);
+
+                snapshot.forEach(doc => {
+                    const sub = doc.data();
+                    const name = sub.studentName || 'Anonymous';
+                    const date = sub.timestamp ? new Date(sub.timestamp.toDate()).toLocaleDateString().replace(/\//g, '-') : 'Unknown_Date';
+                    const textContent = formatTranscriptText(sub.fullTranscript, name, date);
+                    
+                    // Filename: StudentName_Date_ID.txt (ID ensures uniqueness)
+                    const filename = `${name.replace(/\s+/g, '_')}_${date}_${doc.id.substring(0,4)}.txt`;
+                    folder.file(filename, textContent);
+                });
+
+                const content = await zip.generateAsync({ type: "blob" });
+                const url = URL.createObjectURL(content);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${title.replace(/\s+/g, '_')}_All_Submissions.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+            } catch (e) {
+                console.error("Zip Error:", e);
+                alert("Failed to create ZIP file.");
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+
+        // --- SUBMISSIONS LOGIC ---
+        async function openSubmissionsList(code, title) {
+            document.getElementById('submissions-modal').classList.remove('hidden');
+            document.getElementById('submission-modal-title').textContent = title;
+            document.getElementById('submission-modal-code').textContent = `Code: ${code}`;
+            
+            // Setup Download All Button
+            const downloadAllBtn = document.getElementById('download-all-btn');
+            downloadAllBtn.classList.remove('hidden');
+            downloadAllBtn.onclick = () => downloadAllTranscripts(code, title);
+            
+            const container = document.getElementById('submissions-list');
+            container.innerHTML = '<div class="flex justify-center p-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>';
+
+            try {
+                const q = firebase.query(
+                    firebase.collection(db, `artifacts/${appId}/public/data/interview_transcripts`),
+                    firebase.where("interviewCode", "==", code),
+                    firebase.orderBy("timestamp", "desc")
+                );
+                
+                const snapshot = await firebase.getDocs(q);
+                container.innerHTML = '';
+
+                if (snapshot.empty) {
+                    container.innerHTML = `<div class="text-center py-10"><p class="text-gray-500">No submissions yet.</p></div>`;
+                    downloadAllBtn.classList.add('hidden'); // Hide download button if empty
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const sub = doc.data();
+                    const date = sub.timestamp ? new Date(sub.timestamp.toDate()).toLocaleString() : 'Unknown Date';
+                    const name = sub.studentName || 'Anonymous Student';
+                    
+                    // We store the data in a closure for the click handler
+                    // Note: Don't pass objects in HTML attributes, use onclick function closure
+                    const row = document.createElement('div');
+                    row.className = "bg-white p-4 rounded-lg border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition flex justify-between items-center group";
+                    
+                    // Left side: Info (Clickable)
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = "flex items-center gap-4 cursor-pointer flex-1";
+                    infoDiv.onclick = () => openTranscriptViewer(name, date, sub.fullTranscript);
+                    infoDiv.innerHTML = `
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                            ${name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-gray-900 group-hover:text-indigo-600 transition">${name}</h4>
+                            <p class="text-xs text-gray-500">${date}</p>
+                        </div>
+                    `;
+
+                    // Right side: Download Button (Separate)
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = "text-gray-400 hover:text-indigo-600 p-2 transition";
+                    downloadBtn.title = "Download Transcript";
+                    downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation(); // Prevent opening viewer
+                        downloadSingleTranscript(sub.fullTranscript, name, date);
+                    };
+
+                    row.appendChild(infoDiv);
+                    row.appendChild(downloadBtn);
+                    container.appendChild(row);
+                });
+
+            } catch (e) {
+                console.error("Error:", e);
+                container.innerHTML = `<p class="text-red-500 text-center">Error loading data. (Check console for Firebase Index link)</p>`;
+            }
+        }
+
+        function openTranscriptViewer(name, date, transcriptArray) {
+            document.getElementById('transcript-viewer-modal').classList.remove('hidden');
+            document.getElementById('viewer-student-name').textContent = name;
+            document.getElementById('viewer-date').textContent = date;
+            const container = document.getElementById('transcript-content');
+            container.innerHTML = '';
+
+            if (!transcriptArray || transcriptArray.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center italic">Transcript is empty.</p>';
+                return;
+            }
+
+            transcriptArray.forEach(turn => {
+                const isAI = turn.role === 'model';
+                const div = document.createElement('div');
+                div.className = `flex ${isAI ? 'justify-start' : 'justify-end'}`;
+                const bubble = document.createElement('div');
+                bubble.className = `max-w-[85%] p-4 rounded-xl text-sm leading-relaxed ${isAI ? 'bg-gray-100 text-gray-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`;
+                const label = document.createElement('div');
+                label.className = "text-xs font-bold mb-1 opacity-70";
+                label.textContent = isAI ? "Prompta" : name;
+                const text = document.createElement('div');
+                text.innerHTML = turn.text.replace(/\n/g, '<br>');
+                bubble.appendChild(label); bubble.appendChild(text);
+                div.appendChild(bubble); container.appendChild(div);
+            });
+        }
+
+        // --- MODAL CONTROLS ---
+        function openCreateModal() { document.getElementById('create-modal').classList.remove('hidden'); }
+        function closeCreateModal() { document.getElementById('create-modal').classList.add('hidden'); }
+        function closeSubmissionsModal() { document.getElementById('submissions-modal').classList.add('hidden'); }
+        function closeTranscriptViewer() { document.getElementById('transcript-viewer-modal').classList.add('hidden'); }
+
+        window.handleAuth = handleAuth;
+        window.handleFileSelect = handleFileSelect;
+        window.saveInterview = saveInterview;
+        window.deleteInterview = deleteInterview;
+        window.openCreateModal = openCreateModal;
+        window.closeCreateModal = closeCreateModal;
+        window.openSubmissionsList = openSubmissionsList;
+        window.closeSubmissionsModal = closeSubmissionsModal;
+        window.openTranscriptViewer = openTranscriptViewer;
+        window.closeTranscriptViewer = closeTranscriptViewer;
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>

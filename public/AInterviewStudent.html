@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AInterview: Student Interview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        
+        #chat-box::-webkit-scrollbar { width: 6px; }
+        #chat-box::-webkit-scrollbar-track { background: transparent; }
+        #chat-box::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+
+        /* Bouncing Dots Animation */
+        .typing-indicator span {
+            display: inline-block;
+            width: 6px; height: 6px; background-color: #6b7280; border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both; margin: 0 2px;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        /* Mic Pulse */
+        .pulse-ring {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+        @keyframes pulse-red { to { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } }
+    </style>
+    
+    <script type="importmap">
+      { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
+    </script>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        window.firebase = {
+            GoogleGenerativeAI, initializeApp, getAuth, signInAnonymously, signInWithCustomToken,
+            onAuthStateChanged, GoogleAuthProvider, signInWithPopup, getFirestore, doc, getDoc,
+            setDoc, collection, query, where, getDocs, serverTimestamp, setLogLevel
+        };
+    </script>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 transition-opacity duration-300" style="display: none;">
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+            <p class="mt-4 text-white text-lg font-medium" id="loading-message">Initializing...</p>
+        </div>
+    </div>
+
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4">
+            <h4 id="modal-title" class="text-xl font-bold mb-2 text-gray-900"></h4>
+            <p id="modal-message" class="text-gray-600 mb-6"></p>
+            <button onclick="closeModal()" class="w-full py-2 px-4 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition">Close</button>
+        </div>
+    </div>
+
+    <div class="flex-1 flex flex-col w-full h-full relative">
+        
+        <header id="app-header" class="bg-white border-b border-gray-200 p-4 flex justify-between items-center z-10 hidden h-16 shrink-0">
+            <div>
+                <h1 class="text-lg font-bold text-gray-800" id="topic-title-display">AInterview</h1>
+                <div class="flex items-center text-xs text-gray-500 space-x-2">
+                    <span id="teacher-id-display">Loading...</span>
+                </div>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-xs font-bold text-indigo-600 tracking-widest uppercase">CODE</span>
+                <span class="text-xl font-mono font-bold text-gray-900" id="code-display">---</span>
+            </div>
+        </header>
+
+        <div id="auth-container" class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-lg mx-auto">
+            <div id="signin-prompt" class="w-full bg-white p-8 rounded-2xl shadow-xl text-center">
+                <div class="mb-6 text-indigo-600"><i class="fas fa-robot text-5xl"></i></div>
+                <h1 class="text-2xl font-bold text-gray-900 mb-2">Student Login</h1>
+                <p class="text-gray-500 mb-8">Sign in to access your oral assessment.</p>
+                <button id="google-signin-btn" onclick="signInWithGoogle()" class="w-full py-3 px-4 rounded-xl shadow-sm text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                    <i class="fab fa-google"></i> Sign in with Google
+                </button>
+            </div>
+
+            <div id="code-entry-screen" class="hidden w-full bg-white p-8 rounded-2xl shadow-xl text-center flex flex-col gap-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-2">Enter Access Code</h1>
+                    <p id="student-welcome" class="text-gray-600 mb-6"></p>
+                </div>
+                
+                <input type="text" id="interview-code" placeholder="ABCDE" maxlength="5" 
+                    class="w-full text-center text-3xl font-mono font-bold p-4 border-2 border-gray-200 rounded-xl uppercase tracking-[0.5em] focus:border-indigo-500 focus:ring-0 transition placeholder-gray-300 text-gray-800">
+                
+                <button onclick="startInterviewSession()" class="w-full py-4 px-6 rounded-xl shadow-lg text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition duration-200">
+                    Start Interview
+                </button>
+                <p id="code-error" class="text-red-500 text-sm font-medium hidden"></p>
+            </div>
+        </div>
+
+        <div id="chat-screen" class="hidden flex-1 flex flex-col overflow-hidden bg-white w-full max-w-3xl mx-auto sm:border-x sm:border-gray-200">
+            <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scroll-smooth">
+                <div class="text-center text-gray-400 text-sm mt-10">
+                    <i class="fas fa-microphone text-4xl mb-4 opacity-20"></i>
+                    <p>Press the microphone button below to begin.</p>
+                </div>
+            </div>
+
+            <div class="bg-white border-t border-gray-100 shrink-0">
+                <div id="status-bar" class="flex items-center justify-center gap-2 text-sm font-medium text-gray-400 py-3">
+                    <span id="status-icon"><i class="fas fa-circle text-[8px]"></i></span>
+                    <span id="mic-status-text">Ready to start</span>
+                </div>
+
+                <div class="flex justify-center items-center pb-6 pt-2">
+                    <button id="record-btn" onclick="toggleLiveSession()" disabled 
+                        class="relative group w-20 h-20 rounded-full bg-indigo-600 text-white shadow-xl hover:shadow-2xl hover:bg-indigo-700 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-microphone text-2xl group-hover:scale-110 transition-transform"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // --- CONFIGURATION ---
+        const SYSTEM_PROMPT = `
+### IDENTITY & ROLE
+You are "Prompta," a friendly and professional academic interviewer. Your goal is to conduct a 10-minute oral defense assessment with a Grade 12 student based strictly on the provided [ASSESSMENT_TEMPLATE_CONTENT].
+
+### CORE KNOWLEDGE BASE
+The entirety of the interview must be grounded EXCLUSIVELY in the text provided in the [ASSESSMENT_TEMPLATE_CONTENT] below.
+
+### BEHAVIORS & INTERACTION RULES
+1. **Initiation:** Start the interview by introducing yourself.
+2. **Tone:** Maintain a supportive, encouraging, yet professional demeanor.
+3. **The "No Teaching" Rule (CRITICAL):** You are here to ASSESS, not to teach. Never provide the correct answer.
+4. **Feedback:** Provide brief, neutral encouragement.
+
+### TECHNICAL GUARDRAILS (MANDATORY)
+- **NO USER SIMULATION:** You must NEVER generate text labeled "Student:".
+- **STOP SEQUENCE:** After asking ONE question, you must STOP generating text.
+- **LENGTH:** Keep your conversational turns under 50 words.
+`;
+
+        const GEMINI_MODEL = "gemini-2.0-flash-001";
+
+        let appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        let initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        if (!firebaseConfig) {
+            console.warn("Using fallback Firebase config.");
+            firebaseConfig = {
+                apiKey: "AIzaSyAQtJt9GWusgVGWVMYMC_aEyQUdIUS9ae4",
+                authDomain: "tutorbot-184ec.firebaseapp.com",
+                projectId: "tutorbot-184ec",
+                storageBucket: "tutorbot-184ec.firebasestorage.app",
+                messagingSenderId: "666724888666",
+                appId: "1:666724888666:web:003a280426ad97d013e863"
+            };
+        }
+
+        let db, auth, userId, interviewData, transcriptDocRef; 
+        let transcript = []; 
+        let recognition;     
+        let isInterviewActive = false;
+        let isAuthReady = false;
+
+        // --- UTILS ---
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const codeEntryScreen = document.getElementById('code-entry-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const recordBtn = document.getElementById('record-btn');
+        const codeError = document.getElementById('code-error');
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('mic-status-text');
+
+        function showLoading(msg) { document.getElementById('loading-message').textContent = msg; loadingOverlay.style.display = 'flex'; }
+        function hideLoading() { loadingOverlay.style.display = 'none'; }
+        function showModal(t, m) { 
+            document.getElementById('modal-title').textContent = t; 
+            document.getElementById('modal-message').textContent = m; 
+            document.getElementById('modal-container').style.display = 'flex'; 
+        }
+        function closeModal() { document.getElementById('modal-container').style.display = 'none'; }
+
+        // --- UI UPDATES ---
+        function setStatus(state) {
+            // States: 'idle', 'listening', 'thinking', 'speaking'
+            statusBar.className = "flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-300";
+            
+            if (state === 'listening') {
+                statusBar.classList.add('text-red-500');
+                statusText.textContent = "Listening...";
+                recordBtn.classList.add('bg-red-500', 'pulse-ring');
+                recordBtn.classList.remove('bg-indigo-600');
+                recordBtn.innerHTML = '<i class="fas fa-stop text-2xl"></i>';
+            } else if (state === 'thinking') {
+                statusBar.classList.add('text-indigo-500');
+                statusText.textContent = "Prompta is thinking...";
+                recordBtn.classList.remove('bg-red-500', 'pulse-ring');
+                recordBtn.classList.add('bg-gray-400');
+                recordBtn.innerHTML = '<i class="fas fa-brain text-2xl animate-pulse"></i>';
+            } else if (state === 'speaking') {
+                statusBar.classList.add('text-green-600');
+                statusText.textContent = "Prompta is speaking...";
+                recordBtn.classList.remove('bg-gray-400');
+                recordBtn.classList.add('bg-indigo-600');
+                recordBtn.innerHTML = '<i class="fas fa-volume-up text-2xl"></i>';
+            } else {
+                // Idle
+                statusBar.classList.add('text-gray-400');
+                statusText.textContent = "Tap to speak";
+                recordBtn.classList.remove('bg-red-500', 'pulse-ring', 'bg-gray-400');
+                recordBtn.classList.add('bg-indigo-600');
+                recordBtn.innerHTML = '<i class="fas fa-microphone text-2xl"></i>';
+            }
+        }
+
+        function addMessageToChat(role, text) {
+            const chatBox = document.getElementById('chat-box');
+            if (chatBox.children.length === 1 && chatBox.children[0].classList.contains('text-center')) {
+                chatBox.innerHTML = ''; 
+            }
+
+            const isUser = role === 'Student';
+            const div = document.createElement('div');
+            div.className = `flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-4`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-full flex items-center justify-center text-white text-xs shadow-sm shrink-0 ${isUser ? 'ml-2 bg-indigo-500 order-2' : 'mr-2 bg-teal-500 order-1'}`;
+            avatar.innerHTML = isUser ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-[80%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+                isUser 
+                ? 'bg-indigo-600 text-white rounded-tr-none order-1' 
+                : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none order-2'
+            }`;
+            bubble.innerHTML = text.replace(/\n/g, '<br>');
+            
+            div.appendChild(avatar);
+            div.appendChild(bubble);
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.id = 'typing-bubble';
+            div.className = `flex w-full justify-start mb-4`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-full flex items-center justify-center text-white text-xs shadow-sm shrink-0 mr-2 bg-teal-500`;
+            avatar.innerHTML = '<i class="fas fa-robot"></i>';
+
+            const bubble = document.createElement('div');
+            bubble.className = `bg-white border border-gray-100 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1 h-[52px]`;
+            bubble.innerHTML = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+            
+            div.appendChild(avatar);
+            div.appendChild(bubble);
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const el = document.getElementById('typing-bubble');
+            if (el) el.remove();
+        }
+
+        function updateStudentWelcome(user) {
+            const welcomeEl = document.getElementById('student-welcome');
+            if (welcomeEl) {
+                let welcomeMessage = user.displayName ? `Welcome, ${user.displayName.split(' ')[0]}!` : `Welcome, ${user.email}!`;
+                welcomeEl.textContent = welcomeMessage;
+            }
+            document.getElementById('signin-prompt').style.display = 'none';
+            document.getElementById('code-entry-screen').style.display = 'flex';
+        }
+
+        function updateTranscript(role, text) {
+            if (!text) return;
+            transcript.push({
+                role: role.toLowerCase(), 
+                text: text,
+                timestamp: new Date().toISOString()
+            });
+
+            if (transcriptDocRef) {
+                const transcriptData = {
+                    fullTranscript: transcript, 
+                    timestamp: firebase.serverTimestamp(),
+                    interviewCode: interviewData.code,
+                    studentId: userId,
+                    studentName: auth.currentUser.displayName || 'Anonymous Student',
+                    topic: interviewData.title
+                };
+                firebase.setDoc(transcriptDocRef, transcriptData, { merge: true })
+                    .catch(e => console.error("Save Failed:", e));
+            }
+        }
+
+        // --- CORE LOGIC ---
+        function initSpeechToText() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = false; 
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => setStatus('listening');
+                recognition.onend = () => {
+                    if (!isInterviewActive) setStatus('idle');
+                };
+                recognition.onresult = (event) => {
+                    const userText = event.results[0][0].transcript;
+                    handleUserTurn(userText);
+                };
+                recognition.onerror = (event) => {
+                    if (event.error === 'no-speech' && isInterviewActive) {
+                        recognition.start(); 
+                    } else {
+                        console.error("Speech error:", event.error);
+                    }
+                };
+            } else {
+                showModal("Browser Not Supported", "Please use Google Chrome.");
+            }
+        }
+
+        async function handleUserTurn(text) {
+            addMessageToChat('Student', text);
+            updateTranscript('user', text);
+            await getGeminiResponse();
+        }
+
+        async function getGeminiResponse() {
+            setStatus('thinking');
+            showTypingIndicator(); 
+
+            try {
+                const tokenResponse = await fetch(`https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/getGeminiToken`, { method: 'POST' });
+                if (!tokenResponse.ok) throw new Error("Failed to get credentials.");
+                const { token } = await tokenResponse.json();
+
+                const genAI = new firebase.GoogleGenerativeAI(token);
+                const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
+                const fullPromptContent = `${SYSTEM_PROMPT}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
+                const cleanPrompt = fullPromptContent.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+
+                // --- API 400 FIX: Explicitly format System Instruction as Content Object ---
+                const systemInstructionObject = {
+                    role: "system",
+                    parts: [{ text: cleanPrompt }]
+                };
+
+                // --- HISTORY FIX ---
+                let apiHistory = transcript.slice(0, -1).map(entry => ({
+                    role: entry.role,
+                    parts: [{ text: entry.text }]
+                }));
+                if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
+                    apiHistory.unshift({ role: 'user', parts: [{ text: "I am ready to start." }] });
+                }
+
+                // Pass object, not string
+                const modelWithSystem = genAI.getGenerativeModel({ 
+                    model: GEMINI_MODEL, 
+                    systemInstruction: systemInstructionObject 
+                });
+
+                const chatSession = modelWithSystem.startChat({ history: apiHistory });
+                
+                let messageToSend = transcript.length > 0 ? transcript[transcript.length - 1].text : "Please introduce yourself.";
+
+                const result = await chatSession.sendMessage(messageToSend);
+                const aiText = result.response.text();
+
+                // REVEAL
+                removeTypingIndicator();
+                addMessageToChat('Prompta', aiText);
+                updateTranscript('model', aiText);
+                
+                // WAIT 2 SECONDS THEN SPEAK (Browser Voice)
+                setTimeout(() => {
+                    speakText(aiText);
+                }, 2000);
+
+            } catch (error) {
+                removeTypingIndicator();
+                console.error("AI Error:", error);
+                addMessageToChat('System', "Sorry, I encountered an error. Please try again.");
+                setStatus('idle');
+                isInterviewActive = false;
+            }
+        }
+
+        function speakText(text) {
+            if(recognition) recognition.stop(); 
+            window.speechSynthesis.cancel(); 
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+            utterance.voice = voices.find(v => v.name.includes('Natural')) || voices.find(v => v.name.includes('Google US English')) || voices[0];
+            utterance.rate = 1.0;
+
+            utterance.onstart = () => setStatus('speaking');
+            utterance.onend = () => {
+                if (isInterviewActive) {
+                    setStatus('listening');
+                    recognition.start();
+                } else {
+                    setStatus('idle');
+                }
+            };
+            window.speechSynthesis.speak(utterance);
+        }
+
+        async function startLiveSession() {
+            if (!interviewData) return;
+            isInterviewActive = true;
+            if (transcript.length === 0) {
+                await getGeminiResponse(); 
+            } else {
+                setStatus('listening');
+                recognition.start();
+            }
+        }
+
+        function stopLiveSession() {
+            isInterviewActive = false;
+            if (recognition) recognition.stop();
+            window.speechSynthesis.cancel();
+            setStatus('idle');
+        }
+
+        function toggleLiveSession() {
+            isInterviewActive ? stopLiveSession() : startLiveSession();
+        }
+
+        async function signInWithGoogle() {
+            if (!auth) return;
+            const provider = new firebase.GoogleAuthProvider();
+            try {
+                document.getElementById('google-signin-btn').disabled = true;
+                await firebase.signInWithPopup(auth, provider);
+            } catch (error) {
+                showModal("Sign In Failed", error.message);
+                document.getElementById('google-signin-btn').disabled = false;
+            }
+        }
+
+        async function startInterviewSession() {
+            if (!isAuthReady) return;
+            const code = document.getElementById('interview-code').value.trim().toUpperCase();
+            if (!code || code.length !== 5) {
+                codeError.textContent = "Please enter a 5-letter code.";
+                codeError.style.display = 'block';
+                return;
+            }
+            codeError.style.display = 'none';
+            showLoading('Joining session...');
+
+            try {
+                const interviewDocRef = firebase.doc(db, `artifacts/${appId}/public/data/interviews`, code);
+                const docSnap = await firebase.getDoc(interviewDocRef);
+
+                if (!docSnap.exists()) throw new Error("Invalid code. Please check with your teacher.");
+
+                interviewData = docSnap.data();
+                interviewData.code = code;
+                transcriptDocRef = firebase.doc(firebase.collection(db, `artifacts/${appId}/public/data/interview_transcripts`));
+
+                document.getElementById('topic-title-display').textContent = interviewData.title;
+                document.getElementById('teacher-id-display').textContent = `Interviewer: ${interviewData.teacherName || 'Teacher'}`;
+                document.getElementById('code-display').textContent = code;
+                
+                document.getElementById('app-header').classList.remove('hidden');
+                document.getElementById('app-header').classList.add('flex');
+                document.getElementById('auth-container').style.display = 'none';
+                document.getElementById('chat-screen').style.display = 'flex';
+                
+                document.getElementById('record-btn').disabled = false;
+
+            } catch (e) {
+                codeError.textContent = e.message;
+                codeError.style.display = 'block';
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function initFirebase() {
+            if (!firebaseConfig) return;
+            showLoading('Starting AInterview...');
+            try {
+                const app = firebase.initializeApp(firebaseConfig);
+                db = firebase.getFirestore(app);
+                auth = firebase.getAuth(app);
+                
+                firebase.onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        updateStudentWelcome(user);
+                    } else {
+                        userId = null;
+                        isAuthReady = false;
+                        document.getElementById('signin-prompt').style.display = 'block';
+                        document.getElementById('code-entry-screen').style.display = 'none';
+                    }
+                    hideLoading();
+                });
+
+                if (initialAuthToken) await firebase.signInWithCustomToken(auth, initialAuthToken);
+                
+                initSpeechToText();
+                if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                    window.speechSynthesis.onvoiceschanged = () => console.log("TTS Voices loaded.");
+                }
+            } catch (e) {
+                showModal("Error", e.message);
+                hideLoading();
+            }
+        }
+
+        // --- BIND GLOBALS ---
+        window.toggleLiveSession = toggleLiveSession;
+        window.signInWithGoogle = signInWithGoogle;
+        window.startInterviewSession = startInterviewSession;
+        window.closeModal = closeModal;
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>

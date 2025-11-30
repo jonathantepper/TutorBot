@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^6.4.0",
+    "cors": "^2.8.5"
+  }
+}
