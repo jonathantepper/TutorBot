@@ -1,15 +1,12 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const textToSpeech = require("@google-cloud/text-to-speech");
-const cors = require("cors")({origin: true});
 const path = require("path");
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // --- PREMIUM VOICE CONFIGURATION ---
-// SMART AUTH: Only use the JSON key file when running locally (Emulator).
-// In production (Google Cloud), we let Google handle auth automatically.
 const ttsOptions = {};
 if (process.env.FUNCTIONS_EMULATOR === "true") {
   ttsOptions.keyFilename = path.join(__dirname, "service-account.json");
@@ -23,9 +20,10 @@ const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 exports.getGeminiToken = onRequest(
     {
       cors: [
-        "https://tutorbot-184ec.web.app",
-        "http://127.0.0.1:5500",
-        "https://ainterview.curiousit.ca",
+        "http://localhost:5000",       // Your Official Local Port
+        "http://127.0.0.1:5000",       // IP Backup
+        "https://tutorbot-184ec.web.app", // Firebase Hosting
+        "https://ainterview.curiousit.ca", // Custom Domain
       ],
       secrets: ["GEMINI_API_KEY"],
       region: "us-central1",
@@ -41,8 +39,9 @@ exports.getGeminiToken = onRequest(
 exports.deleteInterviewAndTranscripts = onRequest(
     {
       cors: [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
         "https://tutorbot-184ec.web.app",
-        "http://127.0.0.1:5500",
         "https://ainterview.curiousit.ca",
       ],
       region: "us-central1",
@@ -99,13 +98,12 @@ exports.deleteInterviewAndTranscripts = onRequest(
 
         console.log(
             `Deleted interview ${interviewId} and ` +
-            `${transcriptSnapshot.size} transcripts ` +
-            `for teacher ${teacherId}.`,
+            `transcripts for teacher ${teacherId}.`,
         );
 
         res.status(200).json({
           success: true,
-          message: `Interview ${interviewId} and transcripts deleted.`,
+          message: `Interview ${interviewId} deleted.`,
         });
       } catch (error) {
         console.error("Error in deleteInterviewAndTranscripts:", error);
@@ -118,16 +116,16 @@ exports.deleteInterviewAndTranscripts = onRequest(
 
 /**
  * Generates speech from text using Google's Text-to-Speech API.
- * Uses the "Chirp 3 HD" (Journey) voice for premium quality.
  */
 exports.generateSpeech = onRequest(
     {
+      region: "us-central1",
       cors: [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
         "https://tutorbot-184ec.web.app",
-        "http://127.0.0.1:5500",
         "https://ainterview.curiousit.ca",
       ],
-      region: "us-central1",
     },
     async (req, res) => {
       try {
@@ -143,8 +141,6 @@ exports.generateSpeech = onRequest(
 
         const request = {
           input: {text: text},
-          // "Chirp 3 HD" (formerly Journey) - most realistic voice available
-          // Options: 'Fenrir','Puck','Kore','Leda','Charon','Aoede','Zephyr'
           voice: {
             languageCode: "en-US",
             name: "en-US-Chirp3-HD-Fenrir",
@@ -152,10 +148,7 @@ exports.generateSpeech = onRequest(
           audioConfig: {audioEncoding: "MP3"},
         };
 
-        // Call Google Cloud API
         const [response] = await ttsClient.synthesizeSpeech(request);
-
-        // Send the audio content (binary) back to the client as base64
         res.json({audioContent: response.audioContent.toString("base64")});
       } catch (error) {
         console.error("TTS Error:", error);

@@ -19,12 +19,7 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
-      {
-        "source": "!/\\.(html|js|css|png|jpg|gif|svg|pdf)$",
-        "destination": "/index.html"
-      }
-    ]
+    "cleanUrls": true
   },
   "emulators": {
     "auth": {
