@@ -146,11 +146,18 @@
         // --- CONFIG ---
         let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 
-        // If the __firebase_config is not injected (e.g., running locally), use this fallback.
+        // --- SMART CONFIGURATION ---
+        // Automatically picks the right key based on where the app is running
+        const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        
+        const activeApiKey = isLocalHost 
+            ? "AIzaSyAy2-MY2Mjidp2O2xxJcZef2gwdQQv6y3c"  // YOUR DEV KEY (Ends in 6y3c)
+            : "AIzaSyDdBR4c_boRaXpMT8ByYkbhVgXvQ1dNi7Q"; // YOUR PROD KEY (Ends in 9ae4)
+
         if (!firebaseConfig) {
             console.warn("Using fallback Firebase configuration.");
             firebaseConfig = {
-                apiKey: "AIzaSyAQtJt9GWusgVGWVMYMC_aEyQUdIUS9ae4",
+                apiKey: activeApiKey, // Uses the smart variable above
                 authDomain: "tutorbot-184ec.firebaseapp.com",
                 projectId: "tutorbot-184ec",
                 storageBucket: "tutorbot-184ec.firebasestorage.app",

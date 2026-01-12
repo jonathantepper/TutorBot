@@ -120,12 +120,13 @@ exports.deleteInterviewAndTranscripts = onRequest(
 exports.generateSpeech = onRequest(
     {
       region: "us-central1",
+      // THE QUICK LOCK: Only allow your site and local testing
       cors: [
+        "https://ainterview.curiousit.ca",
         "http://localhost:5000",
         "http://127.0.0.1:5000",
-        "https://tutorbot-184ec.web.app",
-        "https://ainterview.curiousit.ca",
       ],
+      secrets: ["GEMINI_API_KEY"],
     },
     async (req, res) => {
       try {
