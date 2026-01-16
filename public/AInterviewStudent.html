@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AInterview: Student Portal</title>
+    <title>AInterview: Student Portal (Agency Mode)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
@@ -30,6 +30,10 @@
             animation: pulse-red 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
         }
         @keyframes pulse-red { to { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } }
+
+        /* Review Mode Transition */
+        .review-mode-active #record-container { display: none; }
+        .review-mode-active #review-container { display: flex; }
     </style>
     
     <script type="importmap">
@@ -42,11 +46,13 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app-check.js";
         
         window.firebase = {
             GoogleGenerativeAI, initializeApp, getAuth, signInAnonymously, signInWithCustomToken,
             onAuthStateChanged, GoogleAuthProvider, signInWithPopup, getFirestore, doc, getDoc,
-            setDoc, collection, query, where, getDocs, serverTimestamp, setLogLevel
+            setDoc, collection, query, where, getDocs, serverTimestamp, setLogLevel,
+            initializeAppCheck, ReCaptchaEnterpriseProvider
         };
     </script>
 </head>
@@ -116,17 +122,40 @@
                 </div>
             </div>
 
-            <div class="bg-white border-t border-gray-100 shrink-0">
+            <div id="input-area" class="bg-white border-t border-gray-100 shrink-0">
                 <div id="status-bar" class="flex items-center justify-center gap-2 text-sm font-medium text-gray-400 py-3">
                     <span id="status-icon"><i class="fas fa-circle text-[8px]"></i></span>
                     <span id="mic-status-text">Ready to start</span>
                 </div>
 
-                <div class="flex justify-center items-center pb-6 pt-2">
-                    <button id="record-btn" onclick="toggleLiveSession()" disabled 
-                        class="relative group w-20 h-20 rounded-full bg-indigo-600 text-white shadow-xl hover:shadow-2xl hover:bg-indigo-700 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
-                        <i class="fas fa-microphone text-2xl group-hover:scale-110 transition-transform"></i>
-                    </button>
+                <div class="pb-6 pt-2 px-4">
+                    
+                    <div id="record-container" class="flex justify-center items-center">
+                        <button id="record-btn" onclick="toggleRecording()" disabled 
+                            class="relative group w-20 h-20 rounded-full bg-indigo-600 text-white shadow-xl hover:shadow-2xl hover:bg-indigo-700 transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-microphone text-2xl group-hover:scale-110 transition-transform"></i>
+                        </button>
+                    </div>
+
+                    <div id="review-container" class="hidden flex-col gap-3 w-full max-w-2xl mx-auto">
+                        <p class="text-sm text-gray-500 italic text-center px-4">
+                            Just speak naturally! Don't worry about punctuation or grammar—the AI listens to your ideas, not your sentence structure.
+                        </p>
+
+                        <textarea id="draft-input" rows="3" 
+                            class="w-full p-4 rounded-xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-0 resize-none text-gray-700 bg-gray-50"
+                            placeholder=""></textarea>
+                        
+                        <div class="flex gap-3">
+                            <button onclick="discardDraft()" class="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                                <i class="fas fa-redo mr-2"></i> Retry
+                            </button>
+                            <button onclick="submitResponse()" class="flex-[2] py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-md transition transform hover:-translate-y-0.5">
+                                <i class="fas fa-paper-plane mr-2"></i> Send Response
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -134,6 +163,7 @@
     
     <script>
         // --- CONFIGURATION ---
+        // UPDATED: Added instruction for checking in with the student
         const SYSTEM_PROMPT = `
 ### IDENTITY & ROLE
 You are "Prompta," a friendly and professional academic interviewer. Your goal is to conduct a 10-minute oral defense assessment with a Grade 12 student based strictly on the provided [ASSESSMENT_TEMPLATE_CONTENT].
@@ -149,17 +179,17 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
     - NEVER explain the concept if the student is stuck.
     - NEVER summarize the book.
     - If a student is wrong, simply say "Thank you for sharing that," and move to the next question.
-4. **Feedback:** Provide brief, neutral encouragement (e.g., "That's a clear point," or "I see what you mean") but do not validate if the answer is "Right" or "Wrong" explicitly.
+4. **Agency & Pacing:** - At the end of a major section (e.g., end of Phase 1), or if the topic is shifting significantly, explicitly ask: "Are you ready to move on to the next part?" 
+    - Do not rush the student.
 
 ### EXECUTION FLOW
 1. **Follow the Phases:** Move systematically through Phase 1, Phase 2, and Phase 3 of the Template.
-2. **The "AI Trap" Check:** When asking "Fact Check" questions from Phase 1, compare the student's answer strictly against the [AI EVALUATION CRITERIA] in the Template. If they miss the specific keywords (e.g., "Scrabble" or "Teeth"), accept it internally as a fail, but move on politely without correcting them.
-3. **Probing:** If an answer is vague, ask ONE follow-up probe (e.g., "Can you give me a specific example from the text?"). If they still struggle, move on.
+2. **The "AI Trap" Check:** When asking "Fact Check" questions from Phase 1, compare the student's answer strictly against the [AI EVALUATION CRITERIA] in the Template. If they miss the specific keywords, accept it internally as a fail, but move on politely.
 
 ### TECHNICAL GUARDRAILS (MANDATORY)
-- **NO USER SIMULATION:** You must NEVER generate text labeled "Student:" or simulate the student's reply. You are ONLY Prompta.
+- **NO USER SIMULATION:** You must NEVER generate text labeled "Student:" or simulate the student's reply.
 - **STOP SEQUENCE:** After asking ONE question, you must STOP generating text immediately to wait for the student.
-- **LENGTH:** Keep your conversational turns under 50 words to ensure the transcript saves correctly.
+- **LENGTH:** Keep your conversational turns under 50 words.
 - **FORMAT:** Always end your turn with a question.
 `;
 
@@ -169,8 +199,7 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
         let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         let initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // --- SMART CONFIGURATION ---
-        // Automatically picks the right key based on where the app is running
+        // --- SMART CONFIGURATION (AUTO-DETECTS LOCALHOST) ---
         const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
         
         const activeApiKey = isLocalHost 
@@ -180,7 +209,7 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
         if (!firebaseConfig) {
             console.warn("Using fallback Firebase configuration.");
             firebaseConfig = {
-                apiKey: activeApiKey, // Uses the smart variable above
+                apiKey: activeApiKey,
                 authDomain: "tutorbot-184ec.firebaseapp.com",
                 projectId: "tutorbot-184ec",
                 storageBucket: "tutorbot-184ec.firebasestorage.app",
@@ -192,7 +221,7 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
         let db, auth, userId, interviewData, transcriptDocRef; 
         let transcript = []; 
         let recognition;     
-        let isInterviewActive = false;
+        let isRecording = false;
         let isAuthReady = false;
 
         // --- UTILS ---
@@ -203,6 +232,11 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
         const codeError = document.getElementById('code-error');
         const statusBar = document.getElementById('status-bar');
         const statusText = document.getElementById('mic-status-text');
+        
+        // NEW UI ELEMENTS
+        const recordContainer = document.getElementById('record-container');
+        const reviewContainer = document.getElementById('review-container');
+        const draftInput = document.getElementById('draft-input');
 
         function showLoading(msg) { document.getElementById('loading-message').textContent = msg; loadingOverlay.style.display = 'flex'; }
         function hideLoading() { loadingOverlay.style.display = 'none'; }
@@ -219,28 +253,60 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             
             if (state === 'listening') {
                 statusBar.classList.add('text-red-500');
-                statusText.textContent = "Listening...";
+                statusText.textContent = "Listening... (Tap Stop when done)";
+                
+                // --- FIX: Force the UI to switch back to the Mic view ---
+                recordContainer.style.display = 'flex';
+                reviewContainer.style.display = 'none';
+
                 recordBtn.classList.add('bg-red-500', 'pulse-ring');
                 recordBtn.classList.remove('bg-indigo-600');
                 recordBtn.innerHTML = '<i class="fas fa-stop text-2xl"></i>';
+                recordBtn.disabled = false;
+
+            } else if (state === 'review') {
+                statusBar.classList.add('text-indigo-600');
+                statusText.textContent = "Review your answer before sending";
+                
+                recordContainer.style.display = 'none';
+                reviewContainer.style.display = 'flex';
+
             } else if (state === 'thinking') {
                 statusBar.classList.add('text-indigo-500');
                 statusText.textContent = "Prompta is thinking...";
+                
+                recordContainer.style.display = 'flex';
+                reviewContainer.style.display = 'none';
+
                 recordBtn.classList.remove('bg-red-500', 'pulse-ring');
                 recordBtn.classList.add('bg-gray-400');
                 recordBtn.innerHTML = '<i class="fas fa-brain text-2xl animate-pulse"></i>';
+                recordBtn.disabled = true;
+
             } else if (state === 'speaking') {
                 statusBar.classList.add('text-green-600');
                 statusText.textContent = "Prompta is speaking...";
+                
+                recordContainer.style.display = 'flex';
+                reviewContainer.style.display = 'none';
+
                 recordBtn.classList.remove('bg-gray-400');
                 recordBtn.classList.add('bg-indigo-600');
                 recordBtn.innerHTML = '<i class="fas fa-volume-up text-2xl"></i>';
+                recordBtn.disabled = true;
+
             } else {
+                // IDLE
                 statusBar.classList.add('text-gray-400');
-                statusText.textContent = "Tap to speak";
+                statusText.textContent = "Tap microphone to answer";
+                
+                recordContainer.style.display = 'flex';
+                reviewContainer.style.display = 'none';
+
                 recordBtn.classList.remove('bg-red-500', 'pulse-ring', 'bg-gray-400');
                 recordBtn.classList.add('bg-indigo-600');
                 recordBtn.innerHTML = '<i class="fas fa-microphone text-2xl"></i>';
+                recordBtn.disabled = false;
             }
         }
 
@@ -342,27 +408,76 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             }
         }
 
-        // --- CORE LOGIC ---
+        // --- NEW AGENCY LOGIC ---
         function initSpeechToText() {
             if ('webkitSpeechRecognition' in window) {
                 recognition = new webkitSpeechRecognition();
-                recognition.continuous = false; 
-                recognition.interimResults = false;
+                recognition.continuous = true;  // Keep listening until user hits STOP
+                recognition.interimResults = true; // Show results in real-time
                 recognition.lang = 'en-US';
 
-                recognition.onstart = () => setStatus('listening');
+                recognition.onstart = () => {
+                    isRecording = true;
+                    setStatus('listening');
+                    draftInput.value = ''; // Clear previous
+                };
+                
                 recognition.onend = () => {
-                    if (!isInterviewActive) setStatus('idle');
-                };
-                recognition.onresult = (event) => {
-                    const userText = event.results[0][0].transcript;
-                    handleUserTurn(userText);
-                };
-                recognition.onerror = (event) => {
-                    if (event.error === 'no-speech' && isInterviewActive) {
-                        recognition.start(); 
+                    isRecording = false;
+
+                    // --- SAFETY CHECK: Only polish if there is text ---
+                    if (draftInput.value.trim().length > 0) {
+                        
+                        let cleanText = draftInput.value.trim();
+
+                        // 1. The "Pause Logic": Turn double spaces (pauses) into ". "
+                        cleanText = cleanText.replace(/\s{2,}/g, ". ");
+
+                        // 2. Capitalize the very first letter
+                        cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+
+                        // 3. Fix lonely " i " -> " I "
+                        cleanText = cleanText.replace(/\b i \b/g, " I ");
+
+                        // 4. Capitalize any letter that comes after a ". " (Created in step 1)
+                        cleanText = cleanText.replace(/(\. )([a-z])/g, (match, separator, letter) => {
+                            return separator + letter.toUpperCase();
+                        });
+                        
+                        // 5. Add a period at the end if it's missing
+                        if (!/[.?!]$/.test(cleanText)) {
+                            cleanText += ".";
+                        }
+
+                        // Update the box
+                        draftInput.value = cleanText;
+                        
+                        setStatus('review');
                     } else {
-                        console.error("Speech error:", event.error);
+                        setStatus('idle');
+                    }
+                };
+
+                recognition.onresult = (event) => {
+                    let finalTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        } else {
+                            // Interim (grey text logic could go here, but for now we just append final)
+                        }
+                    }
+                    // Simple append for now
+                    if (finalTranscript) {
+                        draftInput.value += finalTranscript + ' ';
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error("Speech error:", event.error);
+                    if (event.error !== 'no-speech') {
+                        isRecording = false;
+                        setStatus('idle');
                     }
                 };
             } else {
@@ -370,45 +485,78 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             }
         }
 
-        async function handleUserTurn(text) {
+        // 1. Toggle Recording (The Mic Button)
+        function toggleRecording() {
+            if (isRecording) {
+                recognition.stop(); // Triggers onend -> Review Mode
+            } else {
+                recognition.start(); // Triggers onstart -> Listening Mode
+            }
+        }
+
+        // 2. Discard Draft (The Retry Button)
+        function discardDraft() {
+            draftInput.value = ''; // Clear the messy text
+            recognition.start();   // Auto-start recording immediately
+        }
+
+        // 3. Submit Response (The Send Button)
+        async function submitResponse() {
+            const text = draftInput.value.trim();
+            if (!text) return;
+
+            // UI Cleanup
+            setStatus('thinking');
+            
+            // Send logic
             addMessageToChat('Student', text);
             updateTranscript('user', text);
             await getGeminiResponse();
         }
 
         async function getGeminiResponse() {
-            setStatus('thinking');
+            // UI Cleanup
             showTypingIndicator(); 
+            setStatus('thinking'); // Ensure status is updated immediately
 
             try {
-                // --- SMART URL SWITCH (Part 1: Token) ---
+                // --- 1. SMART ENVIRONMENT CHECK ---
                 const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
                 const functionBaseUrl = isLocal 
                     ? `http://localhost:5001/${firebaseConfig.projectId}/us-central1`
                     : `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net`;
 
-                const tokenResponse = await fetch(`${functionBaseUrl}/getGeminiToken`, { method: 'POST' });
+                // --- 2. KEY SELECTION LOGIC ---
+                let genAI;
                 
-                if (!tokenResponse.ok) throw new Error("Auth Failed");
-                const { token } = await tokenResponse.json();
+                if (isLocal) {
+                    // LOCALHOST: Bypass the server (avoid 403) and use the Dev Key directly
+                    console.log("🔧 Running Locally: Using Dev Key");
+                    genAI = new firebase.GoogleGenerativeAI(activeApiKey);
+                } else {
+                    // PRODUCTION: Securely fetch the token from the Cloud Function
+                    const tokenResponse = await fetch(`${functionBaseUrl}/getGeminiToken`, { method: 'POST' });
+                    if (!tokenResponse.ok) throw new Error("Auth Failed");
+                    const { token } = await tokenResponse.json();
+                    genAI = new firebase.GoogleGenerativeAI(token);
+                }
 
-                const genAI = new firebase.GoogleGenerativeAI(token);
+                // --- 3. MODEL SETUP (Standard) ---
                 const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
                 const fullPromptContent = `${SYSTEM_PROMPT}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
-                const cleanPrompt = fullPromptContent.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
-
-                // --- API 400 FIX: Explicitly format System Instruction as Content Object ---
+                
                 const systemInstructionObject = {
                     role: "system",
-                    parts: [{ text: cleanPrompt }]
+                    parts: [{ text: fullPromptContent }]
                 };
 
-                // --- HISTORY FIX ---
+                // History Fix (Ensure it starts with User)
                 let apiHistory = transcript.slice(0, -1).map(entry => ({
                     role: entry.role,
                     parts: [{ text: entry.text }]
                 }));
+                
                 if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
                     apiHistory.unshift({ role: 'user', parts: [{ text: "I am ready to start." }] });
                 }
@@ -419,16 +567,14 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 });
 
                 const chatSession = modelWithSystem.startChat({ history: apiHistory });
-                
                 let messageToSend = transcript.length > 0 ? transcript[transcript.length - 1].text : "Please introduce yourself.";
 
                 const result = await chatSession.sendMessage(messageToSend);
                 const aiText = result.response.text();
 
-                // --- CLOUD AUDIO FETCH ---
+                // TTS
                 const audioBase64 = await fetchAudio(aiText);
 
-                // REVEAL
                 removeTypingIndicator();
                 addMessageToChat('Prompta', aiText);
                 updateTranscript('model', aiText);
@@ -440,14 +586,11 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 console.error("AI Error:", error);
                 addMessageToChat('System', "Sorry, I encountered an error. Please try again.");
                 setStatus('idle');
-                isInterviewActive = false;
             }
         }
 
-        // --- CLOUD AUDIO LOGIC ---
         async function fetchAudio(text) {
             try {
-                // --- SMART URL SWITCH (Part 2: Audio) ---
                 const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
                 const functionBaseUrl = isLocal 
                     ? `http://localhost:5001/${firebaseConfig.projectId}/us-central1`
@@ -463,7 +606,7 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 const data = await response.json();
                 return data.audioContent;
             } catch (e) {
-                console.warn("Cloud TTS failed. If running locally, this is likely a CORS error. Using fallback voice.", e);
+                console.warn("Cloud TTS failed. Using fallback.", e);
                 return null; 
             }
         }
@@ -480,12 +623,9 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             const audio = new Audio("data:audio/mp3;base64," + base64String);
             audio.onplay = () => setStatus('speaking');
             audio.onended = () => {
-                if (isInterviewActive) {
-                    setStatus('listening');
-                    recognition.start();
-                } else {
-                    setStatus('idle');
-                }
+                setStatus('idle');
+                // Note: We do NOT auto-start recording anymore. 
+                // We go to idle so user can click mic when ready.
             };
             audio.play();
         }
@@ -493,40 +633,10 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
         function speakTextFallback(text) {
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = window.speechSynthesis.getVoices();
-            utterance.voice = voices.find(v => v.name.includes('Natural')) || voices.find(v => v.name.includes('Google US English')) || voices[0];
-            utterance.rate = 1.0;
-
+            utterance.voice = voices.find(v => v.name.includes('Natural')) || voices[0];
             utterance.onstart = () => setStatus('speaking');
-            utterance.onend = () => {
-                if (isInterviewActive) {
-                    recognition.start();
-                    setStatus('listening');
-                }
-            };
+            utterance.onend = () => setStatus('idle');
             window.speechSynthesis.speak(utterance);
-        }
-
-        // --- SESSION CONTROL ---
-        async function startLiveSession() {
-            if (!interviewData) return;
-            isInterviewActive = true;
-            if (transcript.length === 0) {
-                await getGeminiResponse(); 
-            } else {
-                setStatus('listening');
-                recognition.start();
-            }
-        }
-
-        function stopLiveSession() {
-            isInterviewActive = false;
-            if (recognition) recognition.stop();
-            window.speechSynthesis.cancel();
-            setStatus('idle');
-        }
-
-        function toggleLiveSession() {
-            isInterviewActive ? stopLiveSession() : startLiveSession();
         }
 
         async function startInterviewSession() {
@@ -560,6 +670,9 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 document.getElementById('chat-screen').style.display = 'flex';
                 
                 document.getElementById('record-btn').disabled = false;
+                
+                // AUTO START FIRST QUESTION
+                await getGeminiResponse();
 
             } catch (e) {
                 codeError.textContent = e.message;
@@ -574,6 +687,10 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             showLoading('Starting TutorBot...');
             try {
                 const app = firebase.initializeApp(firebaseConfig);
+                const appCheck = firebase.initializeAppCheck(app, {
+                    provider: new firebase.ReCaptchaEnterpriseProvider('6LfuQUgsAAAAAA7yi-9EYCWV8lp_VC10G0dzJ1LO'),
+                    isTokenAutoRefreshEnabled: true
+                });
                 db = firebase.getFirestore(app);
                 auth = firebase.getAuth(app);
                 firebase.onAuthStateChanged(auth, (user) => {
@@ -591,7 +708,6 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
                 });
                 if (initialAuthToken) await firebase.signInWithCustomToken(auth, initialAuthToken);
                 
-                // Ensure voices are loaded for fallback
                 if (window.speechSynthesis) {
                     window.speechSynthesis.getVoices();
                     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
@@ -604,8 +720,9 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             }
         }
 
-        // --- BIND GLOBALS ---
-        window.toggleLiveSession = toggleLiveSession;
+        window.toggleRecording = toggleRecording;
+        window.discardDraft = discardDraft;
+        window.submitResponse = submitResponse;
         window.signInWithGoogle = signInWithGoogle;
         window.startInterviewSession = startInterviewSession;
         window.closeModal = closeModal;

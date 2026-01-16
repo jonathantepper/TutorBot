@@ -20,8 +20,8 @@ const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 exports.getGeminiToken = onRequest(
     {
       cors: [
-        "http://localhost:5000",       // Your Official Local Port
-        "http://127.0.0.1:5000",       // IP Backup
+        "http://localhost:5000", // Your Official Local Port
+        "http://127.0.0.1:5000", // IP Backup
         "https://tutorbot-184ec.web.app", // Firebase Hosting
         "https://ainterview.curiousit.ca", // Custom Domain
       ],
