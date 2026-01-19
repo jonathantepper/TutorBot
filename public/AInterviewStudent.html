@@ -46,12 +46,15 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- NEW: Add the App Check Import ---
         import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app-check.js";
         
+        // --- Update the Bundle ---
         window.firebase = {
             GoogleGenerativeAI, initializeApp, getAuth, signInAnonymously, signInWithCustomToken,
             onAuthStateChanged, GoogleAuthProvider, signInWithPopup, getFirestore, doc, getDoc,
             setDoc, collection, query, where, getDocs, serverTimestamp, setLogLevel,
+            // Add the new tools to the list:
             initializeAppCheck, ReCaptchaEnterpriseProvider
         };
     </script>
@@ -687,10 +690,13 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
             showLoading('Starting TutorBot...');
             try {
                 const app = firebase.initializeApp(firebaseConfig);
+                // --- START: THE VAULT DOOR (Corrected) ---
+                // Notice we now use 'firebase.' before the function names
                 const appCheck = firebase.initializeAppCheck(app, {
                     provider: new firebase.ReCaptchaEnterpriseProvider('6LfuQUgsAAAAAA7yi-9EYCWV8lp_VC10G0dzJ1LO'),
                     isTokenAutoRefreshEnabled: true
                 });
+                // --- END: THE VAULT DOOR ---
                 db = firebase.getFirestore(app);
                 auth = firebase.getAuth(app);
                 firebase.onAuthStateChanged(auth, (user) => {
