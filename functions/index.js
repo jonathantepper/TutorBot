@@ -5,6 +5,7 @@ const path = require("path");
 
 admin.initializeApp();
 const db = admin.firestore();
+const storage = admin.storage(); // <--- NEW: Initialize Storage
 
 // --- PREMIUM VOICE CONFIGURATION ---
 const ttsOptions = {};
@@ -34,7 +35,8 @@ exports.getGeminiToken = onRequest(
 );
 
 /**
- * Deletes an interview and all its associated student transcripts.
+ * Deletes an interview, all its associated student transcripts, 
+ * AND the source PDF files from Cloud Storage.
  */
 exports.deleteInterviewAndTranscripts = onRequest(
     {
@@ -76,6 +78,9 @@ exports.deleteInterviewAndTranscripts = onRequest(
           return;
         }
 
+        // Security Check: Ensure the requester owns the interview
+        // (Note: For Admin deletions, you might bypass this check in the future,
+        // but for now, it ensures safety).
         if (interviewDoc.data().teacherId !== teacherId) {
           res.status(403).json({
             error: "Permission denied. You do not own this interview.",
@@ -83,6 +88,7 @@ exports.deleteInterviewAndTranscripts = onRequest(
           return;
         }
 
+        // 1. DELETE FIRESTORE RECORDS
         const transcriptsQuery = db.collection(transcriptPublicCollectionPath)
             .where("interviewCode", "==", interviewId);
         const transcriptSnapshot = await transcriptsQuery.get();
@@ -93,17 +99,26 @@ exports.deleteInterviewAndTranscripts = onRequest(
         });
 
         batch.delete(interviewDocRef);
-
         await batch.commit();
 
+        // 2. NEW: DELETE CLOUD STORAGE FILES (PDF)
+        // Path structure: interviews/{teacherId}/{interviewId}/{filename}
+        const bucket = storage.bucket();
+        const folderPath = `interviews/${teacherId}/${interviewId}/`;
+
+        // This deletes all files sharing that prefix (effectively the "folder")
+        await bucket.deleteFiles({
+          prefix: folderPath,
+        });
+
         console.log(
-            `Deleted interview ${interviewId} and ` +
-            `transcripts for teacher ${teacherId}.`,
+            `Deleted interview ${interviewId}, transcripts, and ` +
+            `files for teacher ${teacherId}.`,
         );
 
         res.status(200).json({
           success: true,
-          message: `Interview ${interviewId} deleted.`,
+          message: `Interview ${interviewId} completely deleted.`,
         });
       } catch (error) {
         console.error("Error in deleteInterviewAndTranscripts:", error);
