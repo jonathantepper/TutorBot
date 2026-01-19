@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AInterview: Teacher Dashboard</title>
-    <!-- Load Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
@@ -16,19 +15,20 @@
         .modal-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
         .modal-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
     </style>
-    <!-- Firebase Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, where, getDocs, doc, deleteDoc, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // ADDED: Storage Imports
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
         // Expose Firebase components globally
         window.firebase = {
             initializeApp, getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut,
-            getFirestore, collection, query, where, getDocs, doc, deleteDoc, orderBy, serverTimestamp, setDoc
+            getFirestore, collection, query, where, getDocs, doc, deleteDoc, orderBy, serverTimestamp, setDoc,
+            getStorage, ref, uploadBytes, getDownloadURL
         };
     </script>
-    <!-- Load PDF.js Library for reading PDF content -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -147,17 +147,17 @@
         let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 
         // --- SMART CONFIGURATION ---
-        // Automatically picks the right key based on where the app is running
         const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
         
+        // Use Dev Key for Localhost to allow testing
         const activeApiKey = isLocalHost 
-            ? "AIzaSyAy2-MY2Mjidp2O2xxJcZef2gwdQQv6y3c"  // YOUR DEV KEY (Ends in 6y3c)
-            : "AIzaSyDdBR4c_boRaXpMT8ByYkbhVgXvQ1dNi7Q"; // YOUR PROD KEY (Ends in 9ae4)
+            ? "AIzaSyAy2-MY2Mjidp2O2xxJcZef2gwdQQv6y3c" 
+            : "AIzaSyDdBR4c_boRaXpMT8ByYkbhVgXvQ1dNi7Q";
 
         if (!firebaseConfig) {
-            console.warn("Using fallback Firebase configuration.");
+            console.log(isLocalHost ? "🔧 Teacher: Using Local Dev Key" : "🚀 Teacher: Using Live Prod Key");
             firebaseConfig = {
-                apiKey: activeApiKey, // Uses the smart variable above
+                apiKey: activeApiKey,
                 authDomain: "tutorbot-184ec.firebaseapp.com",
                 projectId: "tutorbot-184ec",
                 storageBucket: "tutorbot-184ec.firebasestorage.app",
@@ -167,13 +167,14 @@
         }
         
         const appId = 'default-app-id';
-        let db, auth, currentUser, pdfTextContent = "";
+        let db, auth, storage, currentUser, pdfTextContent = "";
 
         // --- AUTH & INITIALIZATION ---
         async function initApp() {
             const app = firebase.initializeApp(firebaseConfig);
             db = firebase.getFirestore(app);
             auth = firebase.getAuth(app);
+            storage = firebase.getStorage(app); // <--- Initialize Storage
 
             firebase.onAuthStateChanged(auth, (user) => {
                 currentUser = user;
@@ -184,7 +185,6 @@
                     document.getElementById('user-display').classList.remove('hidden');
                     document.getElementById('auth-btn').textContent = 'Sign Out';
                     document.getElementById('auth-btn').onclick = () => firebase.signOut(auth);
-                    // Add a small delay to prevent a race condition where currentUser.uid is not yet available.
                     setTimeout(() => {
                         loadInterviews();
                     }, 100);
@@ -285,25 +285,50 @@
             } catch (e) { alert("Error reading PDF: " + e.message); }
         }
 
+        // --- MAIN SAVE FUNCTION (WITH UPLOAD & EMAIL) ---
         async function saveInterview() {
             const title = document.getElementById('input-title').value;
-            if (!title || !pdfTextContent) { alert("Please enter a title and upload a valid PDF."); return; }
+            const fileInput = document.getElementById('pdf-upload');
+            const file = fileInput.files[0];
+
+            if (!title || !pdfTextContent || !file) { 
+                alert("Please enter a title and upload a valid PDF."); 
+                return; 
+            }
+
             const btn = document.getElementById('save-btn');
-            btn.disabled = true; btn.textContent = "Saving...";
+            btn.disabled = true; btn.textContent = "Uploading...";
 
             try {
                 const code = generateCode();
+                
+                // 1. Upload the PDF File to Cloud Storage
+                // Path: interviews / teacherID / code / filename
+                const storageRef = firebase.ref(storage, `interviews/${currentUser.uid}/${code}/${file.name}`);
+                const snapshot = await firebase.uploadBytes(storageRef, file);
+                const downloadURL = await firebase.getDownloadURL(snapshot.ref);
+
+                // 2. Save Metadata to Firestore
                 await firebase.setDoc(firebase.doc(db, `artifacts/${appId}/public/data/interviews`, code), {
                     title: title,
                     curriculumText: pdfTextContent,
+                    pdfUrl: downloadURL,             // <--- The Cloud Link
                     teacherId: currentUser.uid,
                     teacherName: currentUser.displayName,
+                    teacherEmail: currentUser.email, // <--- The Email Fix
                     timestamp: firebase.serverTimestamp()
                 });
+
                 closeCreateModal();
                 loadInterviews();
-            } catch (e) { console.error(e); alert("Error creating interview."); } 
-            finally { btn.disabled = false; btn.textContent = "Create"; }
+                alert("Interview created successfully!");
+
+            } catch (e) { 
+                console.error(e); 
+                alert("Error creating interview: " + e.message); 
+            } finally { 
+                btn.disabled = false; btn.textContent = "Create"; 
+            }
         }
 
         async function deleteInterview(code) {
@@ -318,7 +343,7 @@
             } catch (e) { console.error(e); alert("Error deleting."); }
         }
 
-        // --- DOWNLOAD LOGIC (NEW) ---
+        // --- DOWNLOAD LOGIC ---
         function formatTranscriptText(transcriptArray, studentName, date) {
             let text = `INTERVIEW TRANSCRIPT\n`;
             text += `Student: ${studentName}\n`;
@@ -374,7 +399,6 @@
                     const date = sub.timestamp ? new Date(sub.timestamp.toDate()).toLocaleDateString().replace(/\//g, '-') : 'Unknown_Date';
                     const textContent = formatTranscriptText(sub.fullTranscript, name, date);
                     
-                    // Filename: StudentName_Date_ID.txt (ID ensures uniqueness)
                     const filename = `${name.replace(/\s+/g, '_')}_${date}_${doc.id.substring(0,4)}.txt`;
                     folder.file(filename, textContent);
                 });
@@ -404,7 +428,6 @@
             document.getElementById('submission-modal-title').textContent = title;
             document.getElementById('submission-modal-code').textContent = `Code: ${code}`;
             
-            // Setup Download All Button
             const downloadAllBtn = document.getElementById('download-all-btn');
             downloadAllBtn.classList.remove('hidden');
             downloadAllBtn.onclick = () => downloadAllTranscripts(code, title);
@@ -424,7 +447,7 @@
 
                 if (snapshot.empty) {
                     container.innerHTML = `<div class="text-center py-10"><p class="text-gray-500">No submissions yet.</p></div>`;
-                    downloadAllBtn.classList.add('hidden'); // Hide download button if empty
+                    downloadAllBtn.classList.add('hidden'); 
                     return;
                 }
 
@@ -433,12 +456,9 @@
                     const date = sub.timestamp ? new Date(sub.timestamp.toDate()).toLocaleString() : 'Unknown Date';
                     const name = sub.studentName || 'Anonymous Student';
                     
-                    // We store the data in a closure for the click handler
-                    // Note: Don't pass objects in HTML attributes, use onclick function closure
                     const row = document.createElement('div');
                     row.className = "bg-white p-4 rounded-lg border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition flex justify-between items-center group";
                     
-                    // Left side: Info (Clickable)
                     const infoDiv = document.createElement('div');
                     infoDiv.className = "flex items-center gap-4 cursor-pointer flex-1";
                     infoDiv.onclick = () => openTranscriptViewer(name, date, sub.fullTranscript);
@@ -452,13 +472,12 @@
                         </div>
                     `;
 
-                    // Right side: Download Button (Separate)
                     const downloadBtn = document.createElement('button');
                     downloadBtn.className = "text-gray-400 hover:text-indigo-600 p-2 transition";
                     downloadBtn.title = "Download Transcript";
                     downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
                     downloadBtn.onclick = (e) => {
-                        e.stopPropagation(); // Prevent opening viewer
+                        e.stopPropagation(); 
                         downloadSingleTranscript(sub.fullTranscript, name, date);
                     };
 
