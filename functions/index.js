@@ -5,7 +5,7 @@ const path = require("path");
 
 // --- FIX 1: Explicitly define the bucket here ---
 admin.initializeApp({
-  storageBucket: "tutorbot-184ec.firebasestorage.app" 
+  storageBucket: "tutorbot-184ec.firebasestorage.app",
 });
 
 const db = admin.firestore();
@@ -22,10 +22,10 @@ const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 exports.getGeminiToken = onRequest(
     {
       cors: [
-        "http://localhost:5000", 
-        "http://127.0.0.1:5000", 
-        "https://tutorbot-184ec.web.app", 
-        "https://ainterview.curiousit.ca", 
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "https://tutorbot-184ec.web.app",
+        "https://ainterview.curiousit.ca",
       ],
       secrets: ["GEMINI_API_KEY"],
       region: "us-central1",
@@ -71,7 +71,7 @@ exports.deleteInterviewAndTranscripts = onRequest(
         const interviewDoc = await interviewDocRef.get();
 
         if (!interviewDoc.exists) {
-          // It might have already been deleted from DB, but check storage anyway? 
+          // Has it been deleted from DB, but check storage anyway?
           // For now, let's fail if record is gone to match UI logic.
           res.status(404).json({error: "Interview not found."});
           return;
@@ -99,12 +99,11 @@ exports.deleteInterviewAndTranscripts = onRequest(
 
         // 2. DELETE CLOUD STORAGE FILES (PDF)
         // Use the default bucket configured in initializeApp
-        const bucket = storage.bucket(); 
-        
+        const bucket = storage.bucket();
         // --- FIX 2: Debugging Log ---
         // Path structure: interviews/{teacherId}/{interviewId}/
         const folderPath = `interviews/${teacherId}/${interviewId}/`;
-        
+
         console.log(`[Cleaner] Checking bucket: ${bucket.name}`);
         console.log(`[Cleaner] Deleting prefix: ${folderPath}`);
 
