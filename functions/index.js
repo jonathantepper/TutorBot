@@ -3,9 +3,13 @@ const admin = require("firebase-admin");
 const textToSpeech = require("@google-cloud/text-to-speech");
 const path = require("path");
 
-admin.initializeApp();
+// --- FIX 1: Explicitly define the bucket here ---
+admin.initializeApp({
+  storageBucket: "tutorbot-184ec.firebasestorage.app" 
+});
+
 const db = admin.firestore();
-const storage = admin.storage(); // <--- NEW: Initialize Storage
+const storage = admin.storage();
 
 // --- PREMIUM VOICE CONFIGURATION ---
 const ttsOptions = {};
@@ -15,16 +19,13 @@ if (process.env.FUNCTIONS_EMULATOR === "true") {
 
 const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 
-/**
- * Returns the Gemini API key to the authenticated client.
- */
 exports.getGeminiToken = onRequest(
     {
       cors: [
-        "http://localhost:5000", // Your Official Local Port
-        "http://127.0.0.1:5000", // IP Backup
-        "https://tutorbot-184ec.web.app", // Firebase Hosting
-        "https://ainterview.curiousit.ca", // Custom Domain
+        "http://localhost:5000", 
+        "http://127.0.0.1:5000", 
+        "https://tutorbot-184ec.web.app", 
+        "https://ainterview.curiousit.ca", 
       ],
       secrets: ["GEMINI_API_KEY"],
       region: "us-central1",
@@ -34,10 +35,6 @@ exports.getGeminiToken = onRequest(
     },
 );
 
-/**
- * Deletes an interview, all its associated student transcripts, 
- * AND the source PDF files from Cloud Storage.
- */
 exports.deleteInterviewAndTranscripts = onRequest(
     {
       cors: [
@@ -74,13 +71,12 @@ exports.deleteInterviewAndTranscripts = onRequest(
         const interviewDoc = await interviewDocRef.get();
 
         if (!interviewDoc.exists) {
+          // It might have already been deleted from DB, but check storage anyway? 
+          // For now, let's fail if record is gone to match UI logic.
           res.status(404).json({error: "Interview not found."});
           return;
         }
 
-        // Security Check: Ensure the requester owns the interview
-        // (Note: For Admin deletions, you might bypass this check in the future,
-        // but for now, it ensures safety).
         if (interviewDoc.data().teacherId !== teacherId) {
           res.status(403).json({
             error: "Permission denied. You do not own this interview.",
@@ -101,12 +97,17 @@ exports.deleteInterviewAndTranscripts = onRequest(
         batch.delete(interviewDocRef);
         await batch.commit();
 
-        // 2. NEW: DELETE CLOUD STORAGE FILES (PDF)
-        // Path structure: interviews/{teacherId}/{interviewId}/{filename}
-        const bucket = storage.bucket();
+        // 2. DELETE CLOUD STORAGE FILES (PDF)
+        // Use the default bucket configured in initializeApp
+        const bucket = storage.bucket(); 
+        
+        // --- FIX 2: Debugging Log ---
+        // Path structure: interviews/{teacherId}/{interviewId}/
         const folderPath = `interviews/${teacherId}/${interviewId}/`;
+        
+        console.log(`[Cleaner] Checking bucket: ${bucket.name}`);
+        console.log(`[Cleaner] Deleting prefix: ${folderPath}`);
 
-        // This deletes all files sharing that prefix (effectively the "folder")
         await bucket.deleteFiles({
           prefix: folderPath,
         });
@@ -129,13 +130,9 @@ exports.deleteInterviewAndTranscripts = onRequest(
     },
 );
 
-/**
- * Generates speech from text using Google's Text-to-Speech API.
- */
 exports.generateSpeech = onRequest(
     {
       region: "us-central1",
-      // THE QUICK LOCK: Only allow your site and local testing
       cors: [
         "https://ainterview.curiousit.ca",
         "http://localhost:5000",
