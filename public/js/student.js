@@ -4,6 +4,9 @@ import {
     isLocalHost, app 
 } from './config.js';
 
+// --- VISUALIZER IMPORT ---
+import { initVisualizer, stopVisualizer } from './visualizer.js';
+
 // --- CONFIGURATION ---
 const SYSTEM_PROMPT = `
 ### IDENTITY & ROLE
@@ -56,6 +59,7 @@ let recognition;
 let isRecording = false;
 let isAuthReady = false;
 let interviewTurnCount = 0; // <--- Tracks progress
+let mediaStream = null;     // <--- Tracks mic stream for visualizer
 
 // --- INITIALIZATION ---
 window.onload = initApp;
@@ -218,7 +222,7 @@ function shufflePhrases() {
     }
 }
 
-// --- UPDATED: Secure Backend Call (Preserving your Transitions & Audio) ---
+// --- SECURE BACKEND CALL ---
 async function getGeminiResponse() {
     showTypingIndicator(); 
     setStatus('thinking');
@@ -232,22 +236,22 @@ async function getGeminiResponse() {
             : "https://getgeminiresponse-4bqegt74dq-uc.a.run.app"; 
 
         // 2. Prepare the Data
-        const fullPrompt = `${SYSTEM_PROMPT}\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
+        const fullPrompt = `${SYSTEM_PROMPT}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
         
-        // Map history (Reuse your existing logic)
+        // Map history
         let apiHistory = transcript.slice(0, -1).map(entry => ({
             role: entry.role,
             parts: [{ text: entry.text }]
         }));
         
-        // Safety check for empty history
+        // Safety check
         if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
             apiHistory.unshift({ role: 'user', parts: [{ text: "I am ready to start." }] });
         }
 
         const messageToSend = transcript.length > 0 ? transcript[transcript.length - 1].text : "Please introduce yourself.";
 
-        // 3. CALL YOUR BACKEND (The new secure way)
+        // 3. CALL YOUR BACKEND
         const response = await fetch(functionUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -265,8 +269,6 @@ async function getGeminiResponse() {
 
         const data = await response.json();
         const aiText = data.response; // The text from Gemini
-
-        // --- EVERYTHING BELOW IS YOUR EXISTING LOGIC (KEPT INTACT) ---
 
         // --- NEW: INCREMENT & APPEND TRANSITION ---
         interviewTurnCount++;
@@ -391,7 +393,7 @@ function setStatus(state) {
     }
 }
 
-// --- SPEECH LOGIC ---
+// --- SPEECH LOGIC (UPDATED WITH VISUALIZER) ---
 function initSpeechToText() {
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
@@ -399,17 +401,32 @@ function initSpeechToText() {
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
-        recognition.onstart = () => { 
+        recognition.onstart = async () => { 
             isRecording = true; 
             setStatus('listening'); 
             draftInput.value = ''; 
+            
+            // --- START VISUALIZER ---
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                initVisualizer(mediaStream);
+            } catch (e) {
+                console.warn("Visualizer failed to start", e);
+            }
         };
         
         recognition.onend = () => {
             isRecording = false;
-            // Only go to review if we actually heard something
+            
+            // --- STOP VISUALIZER ---
+            stopVisualizer();
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
             if (draftInput.value.trim().length > 0) {
-                formatAndShowDraft(); // Cleaned up logic below
+                formatAndShowDraft(); 
             } else {
                 setStatus('idle');
             }
@@ -513,7 +530,9 @@ function updateTranscript(role, text) {
         setDoc(transcriptDocRef, {
             fullTranscript: transcript, timestamp: serverTimestamp(),
             interviewCode: interviewData.code, studentId: userId,
-            studentName: auth.currentUser.displayName || 'Anonymous', topic: interviewData.title
+            studentName: auth.currentUser.displayName || 'Anonymous', 
+            studentEmail: auth.currentUser.email,
+            topic: interviewData.title
         }, { merge: true }).catch(e => console.error(e));
     }
 }
