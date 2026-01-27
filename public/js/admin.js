@@ -19,10 +19,14 @@ function initApp() {
 
     // Attach Event Listeners
     const authBtn = document.getElementById('auth-btn');
-    if (authBtn) authBtn.addEventListener('click', handleAuthButton);
+    if (authBtn) {
+        authBtn.addEventListener('click', handleAuthButton);
+    }
     
     const refreshBtn = document.getElementById('refresh-btn');
-    if (refreshBtn) refreshBtn.addEventListener('click', loadData);
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadData);
+    }
 }
 
 // --- AUTHENTICATION ---
@@ -126,7 +130,9 @@ function renderTeachersByDomain(teachersMap) {
     // Group by Domain
     const domains = {};
     teachers.forEach(t => {
-        if (!domains[t.domain]) domains[t.domain] = [];
+        if (!domains[t.domain]) {
+            domains[t.domain] = [];
+        }
         domains[t.domain].push(t);
     });
 
@@ -333,7 +339,9 @@ window.deleteTeacher = async (teacherId) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ appId, interviewId: docSnap.id, teacherId })
             }).then(response => {
-                if (response.ok) successCount++;
+                if (response.ok) {
+                    successCount++;
+                }
             }).catch(e => console.error(`Failed to delete interview ${docSnap.id}:`, e));
         });
 

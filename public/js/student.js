@@ -21,7 +21,10 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
     - NEVER explain the concept if the student is stuck.
     - NEVER summarize the book.
     - If a student is wrong, simply say "Thank you for sharing that," and move to the next question.
-4. **Agency & Pacing:** - At the end of a major section (e.g., end of Phase 1), or if the topic is shifting significantly, explicitly ask: "Are you ready to move on to the next part?" 
+4. **Handling Non-Answers & Confusion:**
+    - **Step 1:** If a student's answer is unclear, irrelevant (e.g., "Testing", "Umm..."), or nonsensical, DO NOT fail them immediately. Gently paraphrase the question and ask it one more time.
+    - **Step 2:** If the answer is still unclear or irrelevant on the second try, simply say "That's okay, let's move on," and proceed to the NEXT question.
+5. **Agency & Pacing:** - At the end of a major section (e.g., end of Phase 1), or if the topic is shifting significantly, explicitly ask: "Are you ready to move on to the next part?" 
     - Do not rush the student.
 
 ### EXECUTION FLOW
@@ -61,12 +64,12 @@ window.onload = initApp;
 function getTransitionPhrase() {
     // --- Turn 1: The "Onboarding" Instruction ---
     if (interviewTurnCount === 1) {
-        return "Take a breath. When you are done speaking, you can review your answer before submitting.";
+        return "Take a breath and when you are ready, please start speaking. When done press the mic button so you can review your answer before submitting.";
     } 
     
     // --- Turn 2: The "Gentle Reminder" (Different text!) ---
     else if (interviewTurnCount === 2) {
-        return "Remember, take your time. You can always review your response if you need to.";
+        return "Remember, take your time. Press the mic buton to stop. You can always review your response if you need to.";
     }
 
     // --- Turn 3+: The "Shuffled Deck" (Random Variety) ---
@@ -124,14 +127,24 @@ const reviewContainer = document.getElementById('review-container');
 const draftInput = document.getElementById('draft-input');
 const recordBtn = document.getElementById('record-btn');
 
-function showLoading(msg) { document.getElementById('loading-message').textContent = msg; loadingOverlay.style.display = 'flex'; }
-function hideLoading() { loadingOverlay.style.display = 'none'; }
-function showModal(t, m) { 
-    document.getElementById('modal-title').textContent = t; 
-    document.getElementById('modal-message').textContent = m; 
-    document.getElementById('modal-container').style.display = 'flex'; 
+function showLoading(msg) {
+    document.getElementById('loading-message').textContent = msg;
+    loadingOverlay.style.display = 'flex';
 }
-function closeModal() { document.getElementById('modal-container').style.display = 'none'; }
+
+function hideLoading() {
+    loadingOverlay.style.display = 'none';
+}
+
+function showModal(t, m) {
+    document.getElementById('modal-title').textContent = t;
+    document.getElementById('modal-message').textContent = m;
+    document.getElementById('modal-container').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('modal-container').style.display = 'none';
+}
 
 // --- LOGIC ---
 async function signInWithGoogle() {
@@ -402,7 +415,9 @@ function initSpeechToText() {
         recognition.onresult = (event) => {
             let final = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    final += event.results[i][0].transcript;
+                }
             }
             if (final) draftInput.value += final + ' ';
         };
@@ -421,7 +436,9 @@ function startRecording() {
     }
 }
 
-function toggleRecording() { isRecording ? recognition.stop() : recognition.start(); }
+function toggleRecording() {
+    isRecording ? recognition.stop() : recognition.start();
+}
 
 // --- NEW: Retry Logic (Silent Restart) ---
 function handleRetry() {
@@ -465,8 +482,10 @@ function addMessageToChat(role, text) {
     bubble.className = `max-w-[80%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${isUser ? 'bg-indigo-600 text-white rounded-tr-none order-1' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none order-2'}`;
     bubble.innerHTML = text.replace(/\n/g, '<br>');
     
-    div.appendChild(avatar); div.appendChild(bubble);
-    chatBox.appendChild(div); chatBox.scrollTop = chatBox.scrollHeight;
+    div.appendChild(avatar);
+    div.appendChild(bubble);
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 function showTypingIndicator() {
@@ -475,10 +494,14 @@ function showTypingIndicator() {
     div.id = 'typing-bubble';
     div.className = `flex w-full justify-start mb-4`;
     div.innerHTML = `<div class="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-white mr-2"><i class="fas fa-robot"></i></div><div class="bg-white border border-gray-100 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1 h-[52px]"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
-    chatBox.appendChild(div); chatBox.scrollTop = chatBox.scrollHeight;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-function removeTypingIndicator() { const el = document.getElementById('typing-bubble'); if (el) el.remove(); }
+function removeTypingIndicator() {
+    const el = document.getElementById('typing-bubble');
+    if (el) el.remove();
+}
 
 function updateTranscript(role, text) {
     if (!text) return;
@@ -530,8 +553,11 @@ function speakTextFallback(text, onComplete) {
     utterance.onstart = () => setStatus('speaking');
     
     utterance.onend = () => {
-        if (onComplete) onComplete();
-        else setStatus('idle');
+        if (onComplete) {
+            onComplete();
+        } else {
+            setStatus('idle');
+        }
     };
     
     window.speechSynthesis.speak(utterance);
