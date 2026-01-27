@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
     db, auth, collection, doc, getDoc, setDoc, serverTimestamp, 
     signInWithPopup, GoogleAuthProvider, onAuthStateChanged, 
-    isLocalHost, app  // <--- Import 'app', not 'firebaseConfig'
+    isLocalHost, app 
 } from './config.js';
 
 // --- CONFIGURATION ---
@@ -34,21 +34,57 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
 - **LENGTH:** Keep your conversational turns under 50 words.
 - **FORMAT:** Always end your turn with a question.
 `;
+
 const GEMINI_MODEL = "gemini-2.0-flash-001";
 const appId = 'default-app-id';
 
+// --- PROMPT PHRASES (Pool of options) ---
+const ORIGINAL_PHRASES = [
+    "Take a moment to reflect, and start when you are ready.",
+    "I'm ready to listen to your response.",
+];
+
+// Create a copy we can "consume" so we don't destroy the original list
+let availablePhrases = [...ORIGINAL_PHRASES];
+
+// --- GLOBAL VARIABLES ---
 let userId, interviewData, transcriptDocRef; 
 let transcript = []; 
 let recognition;     
 let isRecording = false;
 let isAuthReady = false;
+let interviewTurnCount = 0; // <--- Tracks progress
 
 // --- INITIALIZATION ---
 window.onload = initApp;
 
+function getTransitionPhrase() {
+    // --- Turn 1: The "Onboarding" Instruction ---
+    if (interviewTurnCount === 1) {
+        return "Take a breath. When you are done speaking, you can review your answer before submitting.";
+    } 
+    
+    // --- Turn 2: The "Gentle Reminder" (Different text!) ---
+    else if (interviewTurnCount === 2) {
+        return "Remember, take your time. You can always review your response if you need to.";
+    }
+
+    // --- Turn 3+: The "Shuffled Deck" (Random Variety) ---
+    // As long as we have phrases left in our "deck", use one.
+    else if (availablePhrases.length > 0) {
+        return availablePhrases.shift(); // Removes and returns the top card
+    }
+
+    // --- Turn 8+: Expert Mode (Silent) ---
+    return "";
+}
+
 function initApp() {
     showLoading('Starting TutorBot...');
     
+    // --- NEW: Shuffle the phrases so every student gets a different order ---
+    shufflePhrases(); 
+
     onAuthStateChanged(auth, (user) => {
         if (user) {
             userId = user.uid;
@@ -67,8 +103,10 @@ function initApp() {
     document.getElementById('google-signin-btn').addEventListener('click', signInWithGoogle);
     document.getElementById('start-interview-btn').addEventListener('click', startInterviewSession);
     document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+    
+    // UI Buttons
     document.getElementById('record-btn').addEventListener('click', toggleRecording);
-    document.getElementById('retry-btn').addEventListener('click', discardDraft);
+    document.getElementById('retry-btn').addEventListener('click', handleRetry);
     document.getElementById('submit-btn').addEventListener('click', submitResponse);
 
     if (window.speechSynthesis) {
@@ -149,6 +187,7 @@ async function startInterviewSession() {
         
         document.getElementById('record-btn').disabled = false;
         
+        // Start the First Turn
         await getGeminiResponse();
 
     } catch (e) {
@@ -156,6 +195,14 @@ async function startInterviewSession() {
         codeError.style.display = 'block';
     } finally {
         hideLoading();
+    }
+}
+
+// Fisher-Yates Shuffle Algorithm (Standard for perfect randomness)
+function shufflePhrases() {
+    for (let i = availablePhrases.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availablePhrases[i], availablePhrases[j]] = [availablePhrases[j], availablePhrases[i]];
     }
 }
 
@@ -171,16 +218,11 @@ async function getGeminiResponse() {
             : `https://us-central1-${projectId}.cloudfunctions.net`;
 
         let genAI;
-        
         if (isLocalHost) {
-            // CLEANER FIX: 
-            // We use the key directly from the initialized Firebase App options
-            // This ensures it matches whatever is in config.js (The Dev Key)
             const apiKey = app.options.apiKey; 
-            console.log("🔧 Gemini: Using Local Dev Key from Config");
+            console.log("🔧 Gemini: Using Local Dev Key");
             genAI = new GoogleGenerativeAI(apiKey);
         } else {
-            // Production: Fetch token securely
             const tokenResponse = await fetch(`${functionBaseUrl}/getGeminiToken`, { method: 'POST' });
             if (!tokenResponse.ok) throw new Error("Auth Failed");
             const { token } = await tokenResponse.json();
@@ -210,12 +252,36 @@ async function getGeminiResponse() {
         const result = await chatSession.sendMessage(messageToSend);
         const aiText = result.response.text();
 
-        const audioBase64 = await fetchAudio(aiText);
+        // --- NEW: INCREMENT & APPEND TRANSITION ---
+        interviewTurnCount++;
+
+        // 1. CHECK: Is this just an error message?
+        // If the AI is just asking them to repeat themselves, we don't want to add a "Deep breath" prompt.
+        const isErrorReprompt = aiText.includes("didn't quite catch") || aiText.includes("Say that again");
+
+        // 2. DECIDE: If error, NO transition. If normal, get the phrase.
+        const transition = isErrorReprompt ? "" : getTransitionPhrase();
+        
+        // 3. COMBINE: Create the version the user SEES and HEARS (Question + Potential Phrase)
+        // We add "\n\n" to put the encouragement on a new line visually.
+        const fullResponse = transition ? `${aiText}\n\n${transition}` : aiText;
+
+        const audioBase64 = await fetchAudio(fullResponse);
 
         removeTypingIndicator();
-        addMessageToChat('Prompta', aiText);
+        
+        // 4. UI UPDATE: Show the FULL response (Question + Encouragement)
+        addMessageToChat('Prompta', fullResponse); 
+
+        // 5. MEMORY UPDATE: Save ONLY the clean question to history
+        // This prevents the "Parrot Effect" where the AI learns to repeat the encouragement.
         updateTranscript('model', aiText);
-        playAudio(audioBase64, aiText);
+
+        // 6. AUDIO & AUTO-START: Play full audio, then start mic
+        playAudio(audioBase64, fullResponse, () => {
+            console.log("🔊 Audio ended. Auto-starting mic...");
+            startRecording(); 
+        });
 
     } catch (error) {
         removeTypingIndicator();
@@ -247,11 +313,7 @@ async function fetchAudio(text) {
     }
 }
 
-// ... (Copy remaining helper functions: initSpeechToText, toggleRecording, setStatus, addMessageToChat, etc.)
-// IMPORTANT: Paste the rest of your UI logic here (setStatus, addMessageToChat, playAudio, etc.)
-// I'll provide the UI helpers below to complete the file.
-
-// --- UI HELPER ---
+// --- UPDATED UI HELPER ---
 function setStatus(state) {
     statusBar.className = "flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-300";
     
@@ -259,15 +321,15 @@ function setStatus(state) {
     recordBtn.className = "relative group w-20 h-20 rounded-full text-white shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
 
     if (state === 'listening') {
-        statusBar.classList.add('text-red-500');
-        statusText.textContent = "Listening...";
+        statusBar.classList.add('text-green-600'); // Green text
+        statusText.textContent = "I'm Listening... (Press to Stop)";
         
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
 
-        // Red Pulse
-        recordBtn.classList.add('bg-red-500', 'pulse-ring');
-        recordBtn.innerHTML = '<i class="fas fa-stop text-2xl"></i>';
+        // GREEN PULSE ANIMATION (The "Live" Look)
+        recordBtn.classList.add('bg-green-500', 'animate-pulse', 'border-4', 'border-green-200');
+        recordBtn.innerHTML = '<i class="fas fa-microphone text-3xl"></i>';
         recordBtn.disabled = false;
 
     } else if (state === 'review') {
@@ -289,26 +351,25 @@ function setStatus(state) {
         recordBtn.disabled = true;
 
     } else if (state === 'speaking') {
-        statusBar.classList.add('text-green-600');
+        statusBar.classList.add('text-blue-600');
         statusText.textContent = "Prompta is speaking...";
         
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
 
-        recordBtn.classList.add('bg-indigo-600');
+        recordBtn.classList.add('bg-blue-600', 'pulse-ring'); // Pulse while speaking
         recordBtn.innerHTML = '<i class="fas fa-volume-up text-2xl"></i>';
         recordBtn.disabled = true;
 
     } else {
-        // IDLE / READY STATE
+        // IDLE STATE (Fallback)
         statusBar.classList.add('text-gray-400');
         statusText.textContent = "Tap microphone to answer";
         
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
 
-        // Blue Invite Pulse + Indigo Background
-        recordBtn.classList.add('bg-indigo-600', 'pulse-invite'); // <--- NEW ANIMATION
+        recordBtn.classList.add('bg-indigo-600');
         recordBtn.innerHTML = '<i class="fas fa-microphone text-2xl"></i>';
         recordBtn.disabled = false;
     }
@@ -330,31 +391,9 @@ function initSpeechToText() {
         
         recognition.onend = () => {
             isRecording = false;
+            // Only go to review if we actually heard something
             if (draftInput.value.trim().length > 0) {
-                // --- FULL FORMATTING LOGIC RESTORED ---
-                let cleanText = draftInput.value.trim();
-
-                // 1. Double Space -> Period + Space
-                cleanText = cleanText.replace(/\s{2,}/g, ". ");
-
-                // 2. Capitalize First Letter
-                cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
-
-                // 3. Fix lonely " i " -> " I "
-                cleanText = cleanText.replace(/\b i \b/g, " I ");
-
-                // 4. Capitalize letter after ". " (The fix for the double-space issue)
-                cleanText = cleanText.replace(/(\. )([a-z])/g, (match, separator, letter) => {
-                    return separator + letter.toUpperCase();
-                });
-
-                // 5. Ensure end punctuation
-                if (!/[.?!]$/.test(cleanText)) {
-                    cleanText += ".";
-                }
-
-                draftInput.value = cleanText;
-                setStatus('review');
+                formatAndShowDraft(); // Cleaned up logic below
             } else {
                 setStatus('idle');
             }
@@ -372,8 +411,37 @@ function initSpeechToText() {
     }
 }
 
+// --- NEW: Start Recording Helper (Handles Browser Blocks) ---
+function startRecording() {
+    try {
+        recognition.start();
+    } catch (e) {
+        console.warn("Auto-start blocked. User must click manually.", e);
+        setStatus('idle'); // Fallback to "Tap to Speak"
+    }
+}
+
 function toggleRecording() { isRecording ? recognition.stop() : recognition.start(); }
-function discardDraft() { draftInput.value = ''; recognition.start(); }
+
+// --- NEW: Retry Logic (Silent Restart) ---
+function handleRetry() {
+    draftInput.value = ''; 
+    setStatus('listening'); // Force UI update immediately
+    startRecording();
+}
+
+function formatAndShowDraft() {
+    let cleanText = draftInput.value.trim();
+    cleanText = cleanText.replace(/\s{2,}/g, ". ");
+    cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+    cleanText = cleanText.replace(/\b i \b/g, " I ");
+    cleanText = cleanText.replace(/(\. )([a-z])/g, (match, sep, char) => sep + char.toUpperCase());
+    if (!/[.?!]$/.test(cleanText)) cleanText += ".";
+
+    draftInput.value = cleanText;
+    setStatus('review');
+}
+
 async function submitResponse() {
     const text = draftInput.value.trim();
     if (!text) return;
@@ -424,21 +492,47 @@ function updateTranscript(role, text) {
     }
 }
 
-function playAudio(base64String, textFallback) {
+// --- UPDATED: Play Audio + Callback ---
+function playAudio(base64String, textFallback, onComplete) {
     if (recognition) recognition.stop();
     window.speechSynthesis.cancel(); 
-    if (!base64String) { speakTextFallback(textFallback); return; }
+    
+    if (!base64String) { 
+        speakTextFallback(textFallback, onComplete); 
+        return; 
+    }
+
     const audio = new Audio("data:audio/mp3;base64," + base64String);
+    
     audio.onplay = () => setStatus('speaking');
-    audio.onended = () => setStatus('idle');
-    audio.play();
+    
+    audio.onended = () => {
+        // When audio finishes...
+        if (onComplete) {
+            onComplete(); // <--- TRIGGERS THE AUTO-RECORD
+        } else {
+            setStatus('idle');
+        }
+    };
+    
+    audio.play().catch(e => {
+        console.error("Audio playback failed", e);
+        // If audio fails, still trigger the callback so user isn't stuck
+        if (onComplete) onComplete();
+    });
 }
 
-function speakTextFallback(text) {
+function speakTextFallback(text, onComplete) {
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
     utterance.voice = voices.find(v => v.name.includes('Natural')) || voices[0];
+    
     utterance.onstart = () => setStatus('speaking');
-    utterance.onend = () => setStatus('idle');
+    
+    utterance.onend = () => {
+        if (onComplete) onComplete();
+        else setStatus('idle');
+    };
+    
     window.speechSynthesis.speak(utterance);
 }
