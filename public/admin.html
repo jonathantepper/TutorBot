@@ -7,41 +7,140 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-    <link rel="stylesheet" href="css/style.css"> </head>
-<body class="bg-gray-100 min-h-screen">
+    <link rel="stylesheet" href="css/style.css"> 
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
 
-    <nav class="bg-gray-900 text-white shadow-md">
+    <nav class="bg-gray-900 text-white shadow-md sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-user-shield text-red-500 text-2xl"></i>
-                    <span class="text-xl font-bold">AInterview Admin</span>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-user-shield text-red-500 text-2xl"></i>
+                        <span class="text-xl font-bold hidden sm:block">AInterview Admin</span>
+                    </div>
+                    <span id="role-badge" class="hidden px-3 py-1 rounded-full text-xs font-semibold bg-gray-800 border border-gray-700"></span>
                 </div>
-                <div>
-                    <button id="auth-btn" class="text-sm font-medium bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition">Sign In</button>
+                <div class="flex items-center gap-3">
+                    <button id="manage-team-btn" class="hidden text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-2 rounded-lg transition items-center gap-2">
+                        <i class="fas fa-users-cog"></i> <span class="hidden sm:inline">Manage Team</span>
+                    </button>
+                    <button id="auth-btn" class="text-sm font-medium bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg transition shadow-lg">Sign In</button>
                 </div>
             </div>
         </div>
     </nav>
 
     <main class="max-w-7xl mx-auto px-4 py-8">
+        
         <div id="access-denied" class="text-center py-20">
-            <i class="fas fa-lock text-6xl text-gray-400 mb-4"></i>
-            <h2 class="text-2xl font-bold text-gray-800">Admin Access Required</h2>
-            <p class="text-gray-500 mt-2">Please sign in with an authorized administrator account.</p>
+            <div class="bg-white p-8 rounded-2xl shadow-sm inline-block max-w-md">
+                <i class="fas fa-lock text-6xl text-gray-300 mb-6"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Admin Access Required</h2>
+                <p class="text-gray-500 mt-2 mb-6">Please sign in with an authorized administrator account to manage school interviews.</p>
+                <div class="border-t border-gray-100 pt-4">
+                    <p class="text-xs text-gray-400">Restricted Area • Authorized Personnel Only</p>
+                </div>
+            </div>
         </div>
 
         <div id="dashboard" class="hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-900">Teacher Accounts</h2>
-                <button id="refresh-btn" class="text-indigo-600 hover:text-indigo-800">
-                    <i class="fas fa-sync"></i> Refresh
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">Teacher Accounts</h2>
+                    <p class="text-sm text-gray-500" id="filter-status">Viewing all active accounts</p>
+                </div>
+                <button id="refresh-btn" class="text-gray-600 hover:text-indigo-600 text-sm font-medium transition flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                    <i class="fas fa-sync"></i> Refresh Data
                 </button>
             </div>
-            <div id="teacher-list" class="space-y-4"></div>
+
+            <div id="teacher-list" class="space-y-6"></div>
         </div>
     </main>
 
+    <div id="team-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">Manage Access</h3>
+                    <p class="text-xs text-gray-500">Control who can access this dashboard</p>
+                </div>
+                <button id="close-team-modal" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto">
+                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+                    <h4 class="text-sm font-bold text-indigo-900 mb-3"><i class="fas fa-user-plus mr-1"></i> Add New User</h4>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="email" id="new-user-email" placeholder="email@school.edu" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <select id="new-user-role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="manager">Manager</option>
+                            <option value="admin">Super Admin</option>
+                        </select>
+                        <button id="add-user-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm whitespace-nowrap">
+                            Add User
+                        </button>
+                    </div>
+                    <p class="text-xs text-indigo-400 mt-2 ml-1">
+                        * Managers can only see data from their own email domain.
+                    </p>
+                </div>
+
+                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Authorized Users</h4>
+                <div id="authorized-users-list" class="space-y-2">
+                    <p class="text-center text-gray-400 py-4"><i class="fas fa-spinner fa-spin"></i> Loading users...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="transcript-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 hidden items-center justify-center z-[60] p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800" id="modal-student-name">Student Name</h3>
+                    <p class="text-xs text-gray-500" id="modal-topic">Topic</p>
+                </div>
+                <button onclick="document.getElementById('transcript-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            
+            <div id="modal-content" class="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4">
+                </div>
+
+            <div class="p-4 border-t border-gray-200 bg-white flex justify-end">
+                <button onclick="document.getElementById('transcript-modal').classList.add('hidden')" class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition">
+                    Close Transcript
+                </button>
+            </div>
+        </div>
+    </div>
+ 
+    <div id="transcript-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 hidden items-center justify-center z-[60] p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800" id="modal-student-name">Student Name</h3>
+                    <p class="text-xs text-gray-500" id="modal-topic">Topic</p>
+                </div>
+                <button onclick="document.getElementById('transcript-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            
+            <div id="modal-content" class="flex-1 p-6 overflow-y-auto bg-slate-50 space-y-4">
+                </div>
+
+            <div class="p-4 border-t border-gray-200 bg-white flex justify-end">
+                <button onclick="document.getElementById('transcript-modal').classList.add('hidden')" class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition">
+                    Close Transcript
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
