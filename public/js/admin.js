@@ -19,10 +19,10 @@ function initApp() {
 
     // Attach Event Listeners
     const authBtn = document.getElementById('auth-btn');
-    if(authBtn) authBtn.addEventListener('click', handleAuthButton);
+    if (authBtn) authBtn.addEventListener('click', handleAuthButton);
     
     const refreshBtn = document.getElementById('refresh-btn');
-    if(refreshBtn) refreshBtn.addEventListener('click', loadData);
+    if (refreshBtn) refreshBtn.addEventListener('click', loadData);
 }
 
 // --- AUTHENTICATION ---

@@ -425,7 +425,7 @@ function updateTranscript(role, text) {
 }
 
 function playAudio(base64String, textFallback) {
-    if(recognition) recognition.stop();
+    if (recognition) recognition.stop();
     window.speechSynthesis.cancel(); 
     if (!base64String) { speakTextFallback(textFallback); return; }
     const audio = new Audio("data:audio/mp3;base64," + base64String);

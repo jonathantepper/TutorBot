@@ -62,9 +62,9 @@ exports.deleteInterviewAndTranscripts = onRequest(
         }
 
         const interviewPublicCollectionPath =
-          `artifacts/${appId}/public/data/interviews`;
+        `artifacts/${appId}/public/data/interviews`;
         const transcriptPublicCollectionPath =
-          `artifacts/${appId}/public/data/interview_transcripts`;
+        `artifacts/${appId}/public/data/interview_transcripts`;
 
         const interviewDocRef = db.collection(interviewPublicCollectionPath)
             .doc(interviewId);
@@ -100,7 +100,7 @@ exports.deleteInterviewAndTranscripts = onRequest(
           // This block replaces the "res.status(404)..."
           console.log(
               `[Database] Doc ${interviewId} not found. ` +
-          `Proceeding to clean orphans.`,
+            `Proceeding to clean orphans.`,
           );
         }
 
@@ -118,7 +118,7 @@ exports.deleteInterviewAndTranscripts = onRequest(
 
         console.log(
             `Deleted interview ${interviewId}, transcripts, and ` +
-            `files for teacher ${teacherId}.`,
+          `files for teacher ${teacherId}.`,
         );
 
         res.status(200).json({
@@ -164,7 +164,6 @@ exports.generateSpeech = onRequest(
           },
           audioConfig: {audioEncoding: "MP3"},
         };
-
         const [response] = await ttsClient.synthesizeSpeech(request);
         res.json({audioContent: response.audioContent.toString("base64")});
       } catch (error) {
