@@ -149,13 +149,14 @@ async function saveInterview() {
     const fileInput = document.getElementById('pdf-upload');
     const file = fileInput.files[0];
 
-    if (!title || !pdfTextContent || !file) { 
-        alert("Please enter a title and upload a valid PDF."); 
-        return; 
+    if (!title || !pdfTextContent || !file) {
+        alert("Please enter a title and upload a valid PDF.");
+        return;
     }
 
     const btn = document.getElementById('save-btn');
-    btn.disabled = true; btn.textContent = "Uploading...";
+    btn.disabled = true;
+    btn.textContent = "Uploading...";
 
     try {
         const code = generateCode();
@@ -180,11 +181,12 @@ async function saveInterview() {
         loadInterviews();
         alert("Interview created successfully!");
 
-    } catch (e) { 
-        console.error(e); 
-        alert("Error creating interview: " + e.message); 
-    } finally { 
-        btn.disabled = false; btn.textContent = "Create"; 
+    } catch (e) {
+        console.error(e);
+        alert("Error creating interview: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Create";
     }
 }
 
@@ -202,8 +204,15 @@ window.deleteInterview = async (code) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ appId, interviewId: code, teacherId: currentUser.uid })
         });
-        if (response.ok) loadInterviews(); else alert("Delete failed.");
-    } catch (e) { console.error(e); alert("Error deleting."); }
+        if (response.ok) {
+            loadInterviews();
+        } else {
+            alert("Delete failed.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error deleting.");
+    }
 };
 
 window.openSubmissionsList = async (code, title) => {
@@ -279,9 +288,15 @@ window.openSubmissionsList = async (code, title) => {
 window.openCreateModal = () => document.getElementById('create-modal').classList.remove('hidden');
 
 // --- HELPER FUNCTIONS (Internal) ---
-function closeCreateModal() { document.getElementById('create-modal').classList.add('hidden'); }
-function closeSubmissionsModal() { document.getElementById('submissions-modal').classList.add('hidden'); }
-function closeTranscriptViewer() { document.getElementById('transcript-viewer-modal').classList.add('hidden'); }
+function closeCreateModal() {
+    document.getElementById('create-modal').classList.add('hidden');
+}
+function closeSubmissionsModal() {
+    document.getElementById('submissions-modal').classList.add('hidden');
+}
+function closeTranscriptViewer() {
+    document.getElementById('transcript-viewer-modal').classList.add('hidden');
+}
 
 function openTranscriptViewer(name, date, transcriptArray) {
     document.getElementById('transcript-viewer-modal').classList.remove('hidden');
@@ -306,8 +321,10 @@ function openTranscriptViewer(name, date, transcriptArray) {
         label.textContent = isAI ? "Prompta" : name;
         const text = document.createElement('div');
         text.innerHTML = turn.text.replace(/\n/g, '<br>');
-        bubble.appendChild(label); bubble.appendChild(text);
-        div.appendChild(bubble); container.appendChild(div);
+        bubble.appendChild(label);
+        bubble.appendChild(text);
+        div.appendChild(bubble);
+        container.appendChild(div);
     });
 }
 
@@ -328,7 +345,10 @@ function downloadSingleTranscript(transcriptArray, studentName, date) {
     const a = document.createElement("a");
     a.href = url;
     a.download = `${studentName.replace(/\s+/g, '_')}_Transcript.txt`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 async function downloadAllTranscripts(code, title) {
@@ -363,7 +383,10 @@ async function downloadAllTranscripts(code, title) {
         const a = document.createElement("a");
         a.href = url;
         a.download = `${title.replace(/\s+/g, '_')}_All_Submissions.zip`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
 
     } catch (e) {
         console.error("Zip Error:", e);
