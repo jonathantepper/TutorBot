@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
     db, auth, collection, doc, getDoc, setDoc, serverTimestamp, 
     signInWithPopup, GoogleAuthProvider, onAuthStateChanged, 
@@ -69,7 +68,7 @@ function getTransitionPhrase() {
     
     // --- Turn 2: The "Gentle Reminder" (Different text!) ---
     else if (interviewTurnCount === 2) {
-        return "Remember, take your time. Press the mic buton to stop. You can always review your response if you need to.";
+        return "Remember, take your time. Press the mic button to stop. You can always review your response if you need to.";
     }
 
     // --- Turn 3+: The "Shuffled Deck" (Random Variety) ---
@@ -219,78 +218,80 @@ function shufflePhrases() {
     }
 }
 
-// --- GEMINI & SPEECH ---
+// --- UPDATED: Secure Backend Call (Preserving your Transitions & Audio) ---
 async function getGeminiResponse() {
     showTypingIndicator(); 
     setStatus('thinking');
 
     try {
         const projectId = "tutorbot-184ec";
-        const functionBaseUrl = isLocalHost 
-            ? `http://localhost:5001/${projectId}/us-central1`
-            : `https://us-central1-${projectId}.cloudfunctions.net`;
-
-        let genAI;
-        if (isLocalHost) {
-            const apiKey = app.options.apiKey; 
-            console.log("🔧 Gemini: Using Local Dev Key");
-            genAI = new GoogleGenerativeAI(apiKey);
-        } else {
-            const tokenResponse = await fetch(`${functionBaseUrl}/getGeminiToken`, { method: 'POST' });
-            if (!tokenResponse.ok) throw new Error("Auth Failed");
-            const { token } = await tokenResponse.json();
-            genAI = new GoogleGenerativeAI(token);
-        }
-
-        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-        const fullPrompt = `${SYSTEM_PROMPT}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
         
-        const systemInstructionObject = { role: "system", parts: [{ text: fullPrompt }] };
+        // V2 Function URL (Use the specific URL you found!)
+        const functionUrl = isLocalHost 
+            ? `http://127.0.0.1:5001/${projectId}/us-central1/getGeminiResponse`
+            : "https://getgeminiresponse-4bqegt74dq-uc.a.run.app"; 
 
+        // 2. Prepare the Data
+        const fullPrompt = `${SYSTEM_PROMPT}\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
+        
+        // Map history (Reuse your existing logic)
         let apiHistory = transcript.slice(0, -1).map(entry => ({
             role: entry.role,
             parts: [{ text: entry.text }]
         }));
         
+        // Safety check for empty history
         if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
             apiHistory.unshift({ role: 'user', parts: [{ text: "I am ready to start." }] });
         }
 
-        const chatSession = model.startChat({ 
-            history: apiHistory,
-            systemInstruction: systemInstructionObject
+        const messageToSend = transcript.length > 0 ? transcript[transcript.length - 1].text : "Please introduce yourself.";
+
+        // 3. CALL YOUR BACKEND (The new secure way)
+        const response = await fetch(functionUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                history: apiHistory,
+                message: messageToSend,
+                systemPrompt: fullPrompt
+            })
         });
-        
-        let messageToSend = transcript.length > 0 ? transcript[transcript.length - 1].text : "Please introduce yourself.";
-        const result = await chatSession.sendMessage(messageToSend);
-        const aiText = result.response.text();
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Server Error: ${errText}`);
+        }
+
+        const data = await response.json();
+        const aiText = data.response; // The text from Gemini
+
+        // --- EVERYTHING BELOW IS YOUR EXISTING LOGIC (KEPT INTACT) ---
 
         // --- NEW: INCREMENT & APPEND TRANSITION ---
         interviewTurnCount++;
 
         // 1. CHECK: Is this just an error message?
-        // If the AI is just asking them to repeat themselves, we don't want to add a "Deep breath" prompt.
         const isErrorReprompt = aiText.includes("didn't quite catch") || aiText.includes("Say that again");
 
         // 2. DECIDE: If error, NO transition. If normal, get the phrase.
         const transition = isErrorReprompt ? "" : getTransitionPhrase();
         
-        // 3. COMBINE: Create the version the user SEES and HEARS (Question + Potential Phrase)
-        // We add "\n\n" to put the encouragement on a new line visually.
+        // 3. COMBINE: Create the version the user SEES and HEARS
         const fullResponse = transition ? `${aiText}\n\n${transition}` : aiText;
 
+        // 4. FETCH AUDIO (This calls your other function)
         const audioBase64 = await fetchAudio(fullResponse);
 
         removeTypingIndicator();
         
-        // 4. UI UPDATE: Show the FULL response (Question + Encouragement)
+        // 5. UI UPDATE
         addMessageToChat('Prompta', fullResponse); 
 
-        // 5. MEMORY UPDATE: Save ONLY the clean question to history
-        // This prevents the "Parrot Effect" where the AI learns to repeat the encouragement.
+        // 6. MEMORY UPDATE: Save ONLY the clean question
         updateTranscript('model', aiText);
 
-        // 6. AUDIO & AUTO-START: Play full audio, then start mic
+        // 7. AUDIO & AUTO-START
         playAudio(audioBase64, fullResponse, () => {
             console.log("🔊 Audio ended. Auto-starting mic...");
             startRecording(); 
@@ -299,7 +300,7 @@ async function getGeminiResponse() {
     } catch (error) {
         removeTypingIndicator();
         console.error("AI Error:", error);
-        addMessageToChat('System', "Sorry, I encountered an error. Please try again.");
+        addMessageToChat('System', "Sorry, I lost connection to the brain. Please try again.");
         setStatus('idle');
     }
 }
@@ -307,11 +308,13 @@ async function getGeminiResponse() {
 async function fetchAudio(text) {
     try {
         const projectId = "tutorbot-184ec";
-        const functionBaseUrl = isLocalHost 
-            ? `http://localhost:5001/${projectId}/us-central1`
-            : `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        // V2 Function URL (Use the specific URL you found!)
+        const functionUrl = isLocalHost 
+            ? `http://127.0.0.1:5001/${projectId}/us-central1/generateSpeech`
+            : "https://generatespeech-4bqegt74dq-uc.a.run.app";
 
-        const response = await fetch(`${functionBaseUrl}/generateSpeech`, {
+        const response = await fetch(functionUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })

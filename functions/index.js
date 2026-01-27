@@ -1,6 +1,7 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const textToSpeech = require("@google-cloud/text-to-speech");
+const {GoogleGenerativeAI} = require("@google/generative-ai");
 const path = require("path");
 
 // --- FIX 1: Explicitly define the bucket here ---
@@ -19,7 +20,8 @@ if (process.env.FUNCTIONS_EMULATOR === "true") {
 
 const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 
-exports.getGeminiToken = onRequest(
+// --- NEW SECURE AI FUNCTION (Replaces getGeminiToken) ---
+exports.getGeminiResponse = onRequest(
     {
       cors: [
         "http://localhost:5000",
@@ -27,11 +29,40 @@ exports.getGeminiToken = onRequest(
         "https://tutorbot-184ec.web.app",
         "https://ainterview.curiousit.ca",
       ],
-      secrets: ["GEMINI_API_KEY"],
       region: "us-central1",
+      secrets: ["GEMINI_API_KEY"],
     },
-    (req, res) => {
-      res.status(200).json({token: process.env.GEMINI_API_KEY});
+    async (req, res) => {
+      try {
+        if (req.method !== "POST") {
+          res.status(405).send("Method Not Allowed");
+          return;
+        }
+
+        const {history, message, systemPrompt} = req.body;
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (!apiKey) {
+          throw new Error("Server is missing Gemini API Key");
+        }
+
+        // Initialize Gemini on the server side
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          systemInstruction: systemPrompt,
+        });
+
+        // Convert the history format if needed, or pass directly
+        const chat = model.startChat({history: history || []});
+        const result = await chat.sendMessage(message);
+        const responseText = result.response.text();
+
+        res.status(200).json({response: responseText});
+      } catch (error) {
+        console.error("Gemini Error:", error);
+        res.status(500).json({error: error.message});
+      }
     },
 );
 
@@ -70,11 +101,8 @@ exports.deleteInterviewAndTranscripts = onRequest(
             .doc(interviewId);
         const interviewDoc = await interviewDocRef.get();
 
-        // --- ORPHAN CLEANUP LOGIC (THE CRITICAL FIX) ---
-        // If doc exists, we delete it. If not, we skip the 404 and go
-        // straight to Storage deletion.
+        // --- ORPHAN CLEANUP LOGIC ---
         if (interviewDoc.exists) {
-          // Safety Check: Only check ownership if the doc actually exists
           if (interviewDoc.data().teacherId !== teacherId) {
             res.status(403).json({
               error: "Permission denied. You do not own this interview.",
@@ -97,7 +125,6 @@ exports.deleteInterviewAndTranscripts = onRequest(
           await batch.commit();
           console.log(`[Database] Deleted records for ${interviewId}`);
         } else {
-          // This block replaces the "res.status(404)..."
           console.log(
               `[Database] Doc ${interviewId} not found. ` +
             `Proceeding to clean orphans.`,
@@ -106,7 +133,6 @@ exports.deleteInterviewAndTranscripts = onRequest(
 
         // 3. DELETE CLOUD STORAGE FILES (PDF)
         const bucket = storage.bucket();
-        // Path structure: interviews/{teacherId}/{interviewId}/
         const folderPath = `interviews/${teacherId}/${interviewId}/`;
 
         console.log(`[Cleaner] Checking bucket: ${bucket.name}`);
