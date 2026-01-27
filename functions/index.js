@@ -70,37 +70,42 @@ exports.deleteInterviewAndTranscripts = onRequest(
             .doc(interviewId);
         const interviewDoc = await interviewDocRef.get();
 
-        if (!interviewDoc.exists) {
-          // Has it been deleted from DB, but check storage anyway?
-          // For now, let's fail if record is gone to match UI logic.
-          res.status(404).json({error: "Interview not found."});
-          return;
-        }
+        // --- ORPHAN CLEANUP LOGIC (THE CRITICAL FIX) ---
+        // If doc exists, we delete it. If not, we skip the 404 and go
+        // straight to Storage deletion.
+        if (interviewDoc.exists) {
+          // Safety Check: Only check ownership if the doc actually exists
+          if (interviewDoc.data().teacherId !== teacherId) {
+            res.status(403).json({
+              error: "Permission denied. You do not own this interview.",
+            });
+            return;
+          }
 
-        if (interviewDoc.data().teacherId !== teacherId) {
-          res.status(403).json({
-            error: "Permission denied. You do not own this interview.",
+          // 1. DELETE TRANSCRIPTS
+          const transcriptsQuery = db.collection(transcriptPublicCollectionPath)
+              .where("interviewCode", "==", interviewId);
+          const transcriptSnapshot = await transcriptsQuery.get();
+
+          const batch = db.batch();
+          transcriptSnapshot.forEach((doc) => {
+            batch.delete(doc.ref);
           });
-          return;
+
+          // 2. DELETE INTERVIEW DOC
+          batch.delete(interviewDocRef);
+          await batch.commit();
+          console.log(`[Database] Deleted records for ${interviewId}`);
+        } else {
+          // This block replaces the "res.status(404)..."
+          console.log(
+              `[Database] Doc ${interviewId} not found. ` +
+          `Proceeding to clean orphans.`,
+          );
         }
 
-        // 1. DELETE FIRESTORE RECORDS
-        const transcriptsQuery = db.collection(transcriptPublicCollectionPath)
-            .where("interviewCode", "==", interviewId);
-        const transcriptSnapshot = await transcriptsQuery.get();
-
-        const batch = db.batch();
-        transcriptSnapshot.forEach((doc) => {
-          batch.delete(doc.ref);
-        });
-
-        batch.delete(interviewDocRef);
-        await batch.commit();
-
-        // 2. DELETE CLOUD STORAGE FILES (PDF)
-        // Use the default bucket configured in initializeApp
+        // 3. DELETE CLOUD STORAGE FILES (PDF)
         const bucket = storage.bucket();
-        // --- FIX 2: Debugging Log ---
         // Path structure: interviews/{teacherId}/{interviewId}/
         const folderPath = `interviews/${teacherId}/${interviewId}/`;
 
@@ -118,7 +123,7 @@ exports.deleteInterviewAndTranscripts = onRequest(
 
         res.status(200).json({
           success: true,
-          message: `Interview ${interviewId} completely deleted.`,
+          message: `Cleanup complete for ${interviewId}.`,
         });
       } catch (error) {
         console.error("Error in deleteInterviewAndTranscripts:", error);
