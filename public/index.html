@@ -16,7 +16,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
 
     <nav class="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -52,7 +52,7 @@
         </div>
     </header>
 
-    <section class="py-16 max-w-6xl mx-auto px-4">
+    <section class="py-16 max-w-6xl mx-auto px-4 flex-grow">
         <div class="text-center mb-12">
             <h2 class="text-3xl font-bold text-gray-900">How It Works</h2>
             <p class="text-gray-500 mt-2">A simple workflow for authentic assessment.</p>
@@ -78,8 +78,68 @@
 
     <footer class="bg-white border-t border-gray-200 py-8 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center text-gray-400 text-sm">
-            <p>&copy; 2025 AInterview by <A href="https://www.curiousit.ca/" target="_blank">Jonathan Tepper</A>. Built for Education.</p>
+            <p class="mb-2">&copy; 2026 Greenwood College School. Built by <a href="https://www.curiousit.ca/" target="_blank" class="hover:text-indigo-600 transition-colors">Jonathan Tepper</a>.</p>
+            <div>
+                <span class="cursor-pointer hover:text-indigo-600 transition-colors font-medium" id="privacy-link">
+                    Privacy & Terms
+                </span>
+            </div>
         </div>
     </footer>
+
+    <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Privacy & Terms of Use</h2>
+            
+            <div class="space-y-4 text-sm text-gray-600 leading-relaxed">
+                <p><strong>1. Who We Are</strong><br>
+                This tool was developed by Jonathan Tepper for use within Greenwood College School to explore AI-driven academic assessment.</p>
+
+                <p><strong>2. Open Source & Attribution</strong><br>
+                This software is provided as open-source educational software under the MIT License. Educators are free to use and modify this code, provided that original attribution to Greenwood College School remains intact.</p>
+
+                <p><strong>3. Data Privacy (Student Data)</strong><br>
+                We take your privacy seriously.
+                <ul class="list-disc pl-5 mt-1 space-y-1">
+                    <li><strong>Audio:</strong> Your voice is processed via Google Cloud purely to transcribe your answers.</li>
+                    <li><strong>Transcripts:</strong> Text logs are stored securely for your teacher to review.</li>
+                    <li><strong>AI Processing:</strong> Data sent to the AI is for the sole purpose of this assessment and is not used to train public models.</li>
+                </ul>
+                </p>
+
+                <p><strong>4. Consent</strong><br>
+                By using this tool, you consent to the recording of your voice for the specific purpose of this oral assessment.</p>
+            </div>
+
+            <div class="mt-8 flex justify-end">
+                <button id="close-privacy-btn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('privacy-link').addEventListener('click', () => {
+            const modal = document.getElementById('privacy-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        });
+
+        document.getElementById('close-privacy-btn').addEventListener('click', () => {
+            const modal = document.getElementById('privacy-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        });
+
+        // Close when clicking outside the box
+        document.getElementById('privacy-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('privacy-modal')) {
+                const modal = document.getElementById('privacy-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        });
+    </script>
 </body>
 </html>
