@@ -78,6 +78,9 @@
 
     <footer class="bg-white border-t border-gray-200 py-8 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center text-gray-400 text-sm">
+            <button onclick="document.getElementById('changelog-modal').classList.remove('hidden')" class="text-sm text-gray-500 hover:text-indigo-600 transition underline decoration-dotted underline-offset-4">
+                What's New?
+            </button>
             <p class="mb-2">&copy; 2026 Greenwood College School. Built by <a href="https://www.curiousit.ca/" target="_blank" rel="noopener" class="hover:text-indigo-600 transition-colors">Jonathan Tepper</a>.</p>
             <div>
                 <span class="cursor-pointer hover:text-indigo-600 transition-colors font-medium" id="privacy-link">
@@ -141,5 +144,63 @@
             }
         });
     </script>
+    <div id="changelog-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    
+    <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" onclick="document.getElementById('changelog-modal').classList.add('hidden')"></div>
+
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-gray-100">
+                    <h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">
+                        <i class="fas fa-bullhorn text-indigo-500 mr-2"></i> What's New
+                    </h3>
+                    <button type="button" class="text-gray-400 hover:text-gray-500" onclick="document.getElementById('changelog-modal').classList.add('hidden')" aria-label="Close modal">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="px-4 py-6 sm:px-6 max-h-[60vh] overflow-y-auto">
+                    
+                    <div class="relative pl-6 pb-6 border-l-2 border-indigo-100 last:border-0 last:pb-0">
+                        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white shadow-sm"></div>
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="text-sm font-bold text-gray-900">Version 2.0</h4>
+                            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Jan 28, 2026</span>
+                        </div>
+                        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside marker:text-indigo-300">
+                            <li><strong>Timed Interviews:</strong> Added 3, 5, 10, and 15-minute assessment modes.</li>
+                            <li><strong>Hard Stop:</strong> Microphone now automatically closes when time expires.</li>
+                            <li><strong>Admin Console:</strong> New dashboard for managing authorized teachers.</li>
+                            <li><strong>Accessibility:</strong> Improved screen reader support and keyboard navigation.</li>
+                        </ul>
+                    </div>
+
+                    <div class="relative pl-6 pb-6 border-l-2 border-gray-100 last:border-0 last:pb-0">
+                        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-300 border-4 border-white"></div>
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="text-sm font-bold text-gray-900">Version 1.5</h4>
+                            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Dec 2025</span>
+                        </div>
+                        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside marker:text-gray-300">
+                            <li>Added real-time audio visualizer for students.</li>
+                            <li>Released Teacher Dashboard for PDF curriculum uploads.</li>
+                            <li>Upgraded to Gemini 2.0 Flash for faster responses.</li>
+                        </ul>
+                    </div>
+
+                </div>
+
+                <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                    <button type="button" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto" onclick="document.getElementById('changelog-modal').classList.add('hidden')">
+                        Got it
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
