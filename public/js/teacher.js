@@ -32,9 +32,10 @@ function initApp() {
     document.getElementById('close-viewer-btn').addEventListener('click', closeTranscriptViewer);
 
     // File Upload Area
-    const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('pdf-upload');
-    dropZone.addEventListener('click', () => fileInput.click());
+    
+    // REMOVED: dropZone.addEventListener('click'...) -> The HTML <label> handles this now!
+    
     fileInput.addEventListener('change', (e) => handleFileSelect(e.target));
 }
 
@@ -91,17 +92,23 @@ async function loadInterviews() {
         const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : 'N/A';
         const safeTitle = data.title.replace(/'/g, "\\'");
         
+        // NEW: Check if there is a time limit and create a badge
+        const timeBadge = (data.timeLimit && data.timeLimit > 0)
+            ? `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded ml-2 border border-blue-200"><i class="far fa-clock"></i> ${data.timeLimit}m</span>`
+            : `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded ml-2 border border-gray-200"><i class="fas fa-infinity"></i> No Limit</span>`;
+
         const row = document.createElement('div');
         row.className = "bg-white p-4 rounded-lg border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 hover:shadow-md transition group";
         
         row.innerHTML = `
             <div class="flex-1 min-w-0 text-center sm:text-left">
-                <div class="flex items-center justify-center sm:justify-start gap-3 mb-1">
+                <div class="flex items-center justify-center sm:justify-start gap-2 mb-1 flex-wrap">
                     <h3 class="text-lg font-bold text-gray-900 truncate">${data.title}</h3>
-                    <span class="bg-indigo-100 text-indigo-700 text-xs font-mono font-bold px-2 py-1 rounded">${data.code}</span>
+                    <span class="bg-indigo-100 text-indigo-700 text-xs font-mono font-bold px-2 py-1 rounded border border-indigo-200">${data.code}</span>
+                    ${timeBadge}
                 </div>
                 <p class="text-xs text-gray-500 flex items-center justify-center sm:justify-start gap-1">
-                    <i class="far fa-clock"></i> Created: ${date}
+                    <i class="far fa-calendar-alt"></i> Created: ${date}
                 </p>
             </div>
             
@@ -147,6 +154,7 @@ async function handleFileSelect(input) {
 async function saveInterview() {
     const title = document.getElementById('input-title').value;
     const fileInput = document.getElementById('pdf-upload');
+    const timeSelect = document.getElementById('time-limit-select'); // NEW: Grab the dropdown
     const file = fileInput.files[0];
 
     if (!title || !pdfTextContent || !file) {
@@ -166,7 +174,7 @@ async function saveInterview() {
         const snapshot = await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(snapshot.ref);
 
-        // 2. Save Metadata
+        // 2. Save Metadata (Include Time Limit)
         await setDoc(doc(db, `artifacts/${appId}/public/data/interviews`, code), {
             title: title,
             curriculumText: pdfTextContent,
@@ -174,7 +182,8 @@ async function saveInterview() {
             teacherId: currentUser.uid,
             teacherName: currentUser.displayName,
             teacherEmail: currentUser.email,
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp(),
+            timeLimit: parseInt(timeSelect.value) || 0 // <--- THIS SAVES THE TIME!
         });
 
         closeCreateModal();

@@ -4,13 +4,46 @@ import {
     isLocalHost, app 
 } from './config.js';
 
-// --- VISUALIZER IMPORT ---
 import { initVisualizer, stopVisualizer } from './visualizer.js';
 
 // --- CONFIGURATION ---
-const SYSTEM_PROMPT = `
+const USE_LOCAL_BACKEND = false; 
+
+const GEMINI_MODEL = "gemini-2.0-flash-001";
+const appId = 'default-app-id';
+
+const ORIGINAL_PHRASES = [
+    "Take a moment to reflect, and start when you are ready.",
+    "I'm ready to listen to your response.",
+];
+let availablePhrases = [...ORIGINAL_PHRASES];
+
+let userId, interviewData, transcriptDocRef; 
+let transcript = []; 
+let recognition;     
+let isRecording = false;
+let isAuthReady = false;
+let interviewTurnCount = 0; 
+let mediaStream = null;
+let timerInterval = null;
+let isInterviewExpired = false; // NEW: Global Lock Flag
+
+// --- DYNAMIC SYSTEM PROMPT GENERATOR ---
+function generateSystemPrompt(timeLimit) {
+    const durationText = (timeLimit && timeLimit > 0) 
+        ? `${timeLimit}-minute` 
+        : "untimed (open-ended)";
+
+    let pacingInstruction = "";
+    if (timeLimit && timeLimit <= 5) {
+        pacingInstruction = "Since this is a short interview, move quickly through the phases. Do not spend too long on introductions.";
+    } else {
+        pacingInstruction = "Maintain a steady pace, allowing the student time to elaborate.";
+    }
+
+    return `
 ### IDENTITY & ROLE
-You are "Prompta," a friendly and professional academic interviewer. Your goal is to conduct a 10-minute oral defense assessment with a Grade 12 student based strictly on the provided [ASSESSMENT_TEMPLATE_CONTENT].
+You are "Prompta," a friendly and professional academic interviewer. Your goal is to conduct a ${durationText} oral defense assessment with a Grade 12 student based strictly on the provided [ASSESSMENT_TEMPLATE_CONTENT].
 
 ### CORE KNOWLEDGE BASE
 The entirety of the interview must be grounded EXCLUSIVELY in the text provided in the [ASSESSMENT_TEMPLATE_CONTENT] below. You must not introduce external questions or general knowledge not found in that specific template.
@@ -29,8 +62,8 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
     - **Attempt 1:** DO NOT move to the next question. You MUST gently paraphrase the *current* question and ask it exactly one more time.
     - **Attempt 2:** If the answer is *still* unclear or irrelevant after the paraphrase, simply say "That's okay, let's move on," and proceed to the NEXT question.
 
-5. **Agency & Pacing:** - At the end of a major section (e.g., end of Phase 1), or if the topic is shifting significantly, explicitly ask: "Are you ready to move on to the next part?" 
-    - Do not rush the student.
+5. **Agency & Pacing:** - You are aware this is a ${durationText} interview. ${pacingInstruction}
+    - At the end of a major section (e.g., end of Phase 1), or if the topic is shifting significantly, explicitly ask: "Are you ready to move on to the next part?" 
 
 ### EXECUTION FLOW
 1. **Follow the Phases:** Move systematically through Phase 1, Phase 2, and Phase 3 of the Template.
@@ -42,56 +75,26 @@ The entirety of the interview must be grounded EXCLUSIVELY in the text provided 
 - **LENGTH:** Keep your conversational turns under 50 words.
 - **FORMAT:** Always end your turn with a question.
 `;
-
-const GEMINI_MODEL = "gemini-2.0-flash-001";
-const appId = 'default-app-id';
-
-// --- PROMPT PHRASES (Pool of options) ---
-const ORIGINAL_PHRASES = [
-    "Take a moment to reflect, and start when you are ready.",
-    "I'm ready to listen to your response.",
-];
-
-// Create a copy we can "consume" so we don't destroy the original list
-let availablePhrases = [...ORIGINAL_PHRASES];
-
-// --- GLOBAL VARIABLES ---
-let userId, interviewData, transcriptDocRef; 
-let transcript = []; 
-let recognition;     
-let isRecording = false;
-let isAuthReady = false;
-let interviewTurnCount = 0; // <--- Tracks progress
-let mediaStream = null;     // <--- Tracks mic stream for visualizer
+}
 
 // --- INITIALIZATION ---
 window.onload = initApp;
 
 function getTransitionPhrase() {
-    // --- Turn 1: The "Onboarding" Instruction ---
     if (interviewTurnCount === 1) {
         return "Take a breath and when you are ready, please start speaking. When done press the mic button so you can review your answer before submitting.";
     } 
-    
-    // --- Turn 2: The "Gentle Reminder" (Different text!) ---
     else if (interviewTurnCount === 2) {
         return "Remember, take your time. Press the mic button to stop. You can always review your response if you need to.";
     }
-
-    // --- Turn 3+: The "Shuffled Deck" (Random Variety) ---
-    // As long as we have phrases left in our "deck", use one.
     else if (availablePhrases.length > 0) {
-        return availablePhrases.shift(); // Removes and returns the top card
+        return availablePhrases.shift();
     }
-
-    // --- Turn 8+: Expert Mode (Silent) ---
     return "";
 }
 
 function initApp() {
     showLoading('Starting TutorBot...');
-    
-    // --- NEW: Shuffle the phrases so every student gets a different order ---
     shufflePhrases(); 
 
     onAuthStateChanged(auth, (user) => {
@@ -108,12 +111,10 @@ function initApp() {
         hideLoading();
     });
 
-    // Event Listeners
+    // Buttons
     document.getElementById('google-signin-btn').addEventListener('click', signInWithGoogle);
     document.getElementById('start-interview-btn').addEventListener('click', startInterviewSession);
     document.getElementById('close-modal-btn').addEventListener('click', closeModal);
-    
-    // UI Buttons
     document.getElementById('record-btn').addEventListener('click', toggleRecording);
     document.getElementById('retry-btn').addEventListener('click', handleRetry);
     document.getElementById('submit-btn').addEventListener('click', submitResponse);
@@ -150,6 +151,69 @@ function showModal(t, m) {
 
 function closeModal() {
     document.getElementById('modal-container').style.display = 'none';
+}
+
+function updateProgress(turn) {
+    const s1 = document.getElementById('step-1'); 
+    const s2 = document.getElementById('step-2'); 
+    const s3 = document.getElementById('step-3'); 
+    const s4 = document.getElementById('step-4'); 
+
+    const gray = "bg-gray-200";
+    const active = "bg-indigo-600";
+
+    s1.className = `flex-1 h-1.5 rounded-full transition-all duration-500 ${active}`;
+
+    if (turn >= 2) s2.className = s2.className.replace(gray, active);
+    if (turn >= 5) s3.className = s3.className.replace(gray, active);
+    if (turn >= 8) s4.className = s4.className.replace(gray, active);
+}
+
+// --- TIMER & HARD STOP LOGIC ---
+function startTimer(minutes) {
+    const timerDisplay = document.getElementById('timer-display');
+    const timeLabel = document.getElementById('time-remaining');
+    
+    if (!timerDisplay || !timeLabel) return;
+
+    if (!minutes || minutes <= 0) {
+        timerDisplay.classList.add('hidden');
+        return;
+    }
+
+    timerDisplay.classList.remove('hidden');
+    let secondsLeft = minutes * 60;
+
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    timeLabel.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+    if (timerInterval) clearInterval(timerInterval);
+
+    timerInterval = setInterval(() => {
+        secondsLeft--;
+
+        const m = Math.floor(secondsLeft / 60);
+        const s = secondsLeft % 60;
+        timeLabel.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+        if (secondsLeft <= 60) {
+            timerDisplay.classList.remove('text-indigo-600', 'bg-indigo-50');
+            timerDisplay.classList.add('text-red-600', 'bg-red-50', 'animate-pulse');
+        }
+
+        if (secondsLeft <= 0) {
+            clearInterval(timerInterval);
+            timeLabel.textContent = "00:00";
+            
+            // --- HARD STOP TRIGGER ---
+            isInterviewExpired = true;
+            if (isRecording) recognition.stop(); // Cut the mic
+            setStatus('expired'); // Lock the UI
+            
+            addMessageToChat('System', "<b>Time is up!</b> The interview is now closed. Great job!");
+        }
+    }, 1000);
 }
 
 // --- LOGIC ---
@@ -201,12 +265,19 @@ async function startInterviewSession() {
         
         document.getElementById('app-header').classList.remove('hidden');
         document.getElementById('app-header').classList.add('flex');
+        document.getElementById('progress-container').classList.remove('hidden');
+
+        // Reset State
+        isInterviewExpired = false;
+        
+        if (interviewData.timeLimit && interviewData.timeLimit > 0) {
+            startTimer(interviewData.timeLimit);
+        }
+
         document.getElementById('auth-container').style.display = 'none';
         document.getElementById('chat-screen').style.display = 'flex';
-        
         document.getElementById('record-btn').disabled = false;
         
-        // Start the First Turn
         await getGeminiResponse();
 
     } catch (e) {
@@ -217,7 +288,6 @@ async function startInterviewSession() {
     }
 }
 
-// Fisher-Yates Shuffle Algorithm (Standard for perfect randomness)
 function shufflePhrases() {
     for (let i = availablePhrases.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -225,36 +295,30 @@ function shufflePhrases() {
     }
 }
 
-// --- SECURE BACKEND CALL ---
 async function getGeminiResponse() {
     showTypingIndicator(); 
     setStatus('thinking');
 
     try {
         const projectId = "tutorbot-184ec";
-        
-        // V2 Function URL (Use the specific URL you found!)
-        const functionUrl = isLocalHost 
+        const functionUrl = (isLocalHost && USE_LOCAL_BACKEND)
             ? `http://127.0.0.1:5001/${projectId}/us-central1/getGeminiResponse`
             : "https://getgeminiresponse-4bqegt74dq-uc.a.run.app"; 
 
-        // 2. Prepare the Data
-        const fullPrompt = `${SYSTEM_PROMPT}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
+        const dynamicSystemPrompt = generateSystemPrompt(interviewData.timeLimit);
+        const fullPrompt = `${dynamicSystemPrompt}\n\n[ASSESSMENT_TEMPLATE_CONTENT]:\n${interviewData.curriculumText}`;
         
-        // Map history
         let apiHistory = transcript.slice(0, -1).map(entry => ({
             role: entry.role,
             parts: [{ text: entry.text }]
         }));
         
-        // Safety check
         if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
             apiHistory.unshift({ role: 'user', parts: [{ text: "I am ready to start." }] });
         }
 
         const messageToSend = transcript.length > 0 ? transcript[transcript.length - 1].text : "Please introduce yourself.";
 
-        // 3. CALL YOUR BACKEND
         const response = await fetch(functionUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -271,35 +335,25 @@ async function getGeminiResponse() {
         }
 
         const data = await response.json();
-        const aiText = data.response; // The text from Gemini
+        const aiText = data.response; 
 
-        // --- NEW: INCREMENT & APPEND TRANSITION ---
+        // --- UPDATE PROGRESS ---
         interviewTurnCount++;
+        updateProgress(interviewTurnCount); 
 
-        // 1. CHECK: Is this just an error message?
         const isErrorReprompt = aiText.includes("didn't quite catch") || aiText.includes("Say that again");
-
-        // 2. DECIDE: If error, NO transition. If normal, get the phrase.
         const transition = isErrorReprompt ? "" : getTransitionPhrase();
-        
-        // 3. COMBINE: Create the version the user SEES and HEARS
         const fullResponse = transition ? `${aiText}\n\n${transition}` : aiText;
 
-        // 4. FETCH AUDIO (This calls your other function)
         const audioBase64 = await fetchAudio(fullResponse);
 
         removeTypingIndicator();
-        
-        // 5. UI UPDATE
         addMessageToChat('Prompta', fullResponse); 
-
-        // 6. MEMORY UPDATE: Save ONLY the clean question
         updateTranscript('model', aiText);
 
-        // 7. AUDIO & AUTO-START
         playAudio(audioBase64, fullResponse, () => {
-            console.log("🔊 Audio ended. Auto-starting mic...");
-            startRecording(); 
+            console.log("🔊 Audio ended. Checking for auto-start...");
+            startRecording(); // This will check isInterviewExpired internally
         });
 
     } catch (error) {
@@ -313,9 +367,7 @@ async function getGeminiResponse() {
 async function fetchAudio(text) {
     try {
         const projectId = "tutorbot-184ec";
-        
-        // V2 Function URL (Use the specific URL you found!)
-        const functionUrl = isLocalHost 
+        const functionUrl = (isLocalHost && USE_LOCAL_BACKEND)
             ? `http://127.0.0.1:5001/${projectId}/us-central1/generateSpeech`
             : "https://generatespeech-4bqegt74dq-uc.a.run.app";
 
@@ -334,21 +386,28 @@ async function fetchAudio(text) {
     }
 }
 
-// --- UPDATED UI HELPER ---
 function setStatus(state) {
-    statusBar.className = "flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-300";
-    
-    // Reset Button Classes
-    recordBtn.className = "relative group w-20 h-20 rounded-full text-white shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
-
-    if (state === 'listening') {
-        statusBar.classList.add('text-green-600'); // Green text
-        statusText.textContent = "I'm Listening... (Press to Stop)";
-        
+    // --- GLOBAL LOCK: If expired, FORCE the closed state ---
+    if (isInterviewExpired) {
+        statusBar.className = "flex items-center justify-center gap-2 text-sm font-medium text-red-600";
+        statusText.textContent = "Interview Closed";
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
+        
+        recordBtn.className = "relative group w-16 h-16 rounded-full bg-gray-100 text-gray-400 cursor-not-allowed flex items-center justify-center shadow-none border-0";
+        recordBtn.innerHTML = '<i class="fas fa-ban text-2xl"></i>';
+        recordBtn.disabled = true;
+        return; // EXIT FUNCTION
+    }
 
-        // GREEN PULSE ANIMATION (The "Live" Look)
+    statusBar.className = "flex items-center justify-center gap-2 text-sm font-medium transition-colors duration-300";
+    recordBtn.className = "relative group w-16 h-16 rounded-full text-white shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed";
+
+    if (state === 'listening') {
+        statusBar.classList.add('text-green-600'); 
+        statusText.textContent = "I'm Listening... (Press to Stop)";
+        recordContainer.style.display = 'flex'; 
+        reviewContainer.style.display = 'none';
         recordBtn.classList.add('bg-green-500', 'animate-pulse', 'border-4', 'border-green-200');
         recordBtn.innerHTML = '<i class="fas fa-microphone text-3xl"></i>';
         recordBtn.disabled = false;
@@ -356,17 +415,14 @@ function setStatus(state) {
     } else if (state === 'review') {
         statusBar.classList.add('text-indigo-600');
         statusText.textContent = "Review your answer";
-        
         recordContainer.style.display = 'none'; 
         reviewContainer.style.display = 'flex';
 
     } else if (state === 'thinking') {
         statusBar.classList.add('text-indigo-500');
         statusText.textContent = "Prompta is thinking...";
-        
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
-
         recordBtn.classList.add('bg-gray-400');
         recordBtn.innerHTML = '<i class="fas fa-brain text-2xl animate-pulse"></i>';
         recordBtn.disabled = true;
@@ -374,29 +430,23 @@ function setStatus(state) {
     } else if (state === 'speaking') {
         statusBar.classList.add('text-blue-600');
         statusText.textContent = "Prompta is speaking...";
-        
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
-
-        recordBtn.classList.add('bg-blue-600', 'pulse-ring'); // Pulse while speaking
+        recordBtn.classList.add('bg-blue-600', 'pulse-ring'); 
         recordBtn.innerHTML = '<i class="fas fa-volume-up text-2xl"></i>';
         recordBtn.disabled = true;
 
     } else {
-        // IDLE STATE (Fallback)
         statusBar.classList.add('text-gray-400');
         statusText.textContent = "Tap microphone to answer";
-        
         recordContainer.style.display = 'flex'; 
         reviewContainer.style.display = 'none';
-
         recordBtn.classList.add('bg-indigo-600');
         recordBtn.innerHTML = '<i class="fas fa-microphone text-2xl"></i>';
         recordBtn.disabled = false;
     }
 }
 
-// --- SPEECH LOGIC (UPDATED WITH VISUALIZER) ---
 function initSpeechToText() {
     if ('webkitSpeechRecognition' in window) {
         recognition = new webkitSpeechRecognition();
@@ -408,8 +458,6 @@ function initSpeechToText() {
             isRecording = true; 
             setStatus('listening'); 
             draftInput.value = ''; 
-            
-            // --- START VISUALIZER ---
             try {
                 mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 initVisualizer(mediaStream);
@@ -420,14 +468,11 @@ function initSpeechToText() {
         
         recognition.onend = () => {
             isRecording = false;
-            
-            // --- STOP VISUALIZER ---
             stopVisualizer();
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop());
                 mediaStream = null;
             }
-
             if (draftInput.value.trim().length > 0) {
                 formatAndShowDraft(); 
             } else {
@@ -449,24 +494,30 @@ function initSpeechToText() {
     }
 }
 
-// --- NEW: Start Recording Helper (Handles Browser Blocks) ---
 function startRecording() {
+    // --- LOCKOUT CHECK ---
+    if (isInterviewExpired) {
+        console.log("Timer expired. Microphone auto-start blocked.");
+        return;
+    }
     try {
         recognition.start();
     } catch (e) {
         console.warn("Auto-start blocked. User must click manually.", e);
-        setStatus('idle'); // Fallback to "Tap to Speak"
+        setStatus('idle');
     }
 }
 
 function toggleRecording() {
+    // --- LOCKOUT CHECK ---
+    if (isInterviewExpired) return;
+    
     isRecording ? recognition.stop() : recognition.start();
 }
 
-// --- NEW: Retry Logic (Silent Restart) ---
 function handleRetry() {
     draftInput.value = ''; 
-    setStatus('listening'); // Force UI update immediately
+    setStatus('listening'); 
     startRecording();
 }
 
@@ -540,7 +591,6 @@ function updateTranscript(role, text) {
     }
 }
 
-// --- UPDATED: Play Audio + Callback ---
 function playAudio(base64String, textFallback, onComplete) {
     if (recognition) recognition.stop();
     window.speechSynthesis.cancel(); 
@@ -551,21 +601,12 @@ function playAudio(base64String, textFallback, onComplete) {
     }
 
     const audio = new Audio("data:audio/mp3;base64," + base64String);
-    
     audio.onplay = () => setStatus('speaking');
-    
     audio.onended = () => {
-        // When audio finishes...
-        if (onComplete) {
-            onComplete(); // <--- TRIGGERS THE AUTO-RECORD
-        } else {
-            setStatus('idle');
-        }
+        if (onComplete) onComplete(); else setStatus('idle');
     };
-    
     audio.play().catch(e => {
         console.error("Audio playback failed", e);
-        // If audio fails, still trigger the callback so user isn't stuck
         if (onComplete) onComplete();
     });
 }
@@ -574,16 +615,9 @@ function speakTextFallback(text, onComplete) {
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
     utterance.voice = voices.find(v => v.name.includes('Natural')) || voices[0];
-    
     utterance.onstart = () => setStatus('speaking');
-    
     utterance.onend = () => {
-        if (onComplete) {
-            onComplete();
-        } else {
-            setStatus('idle');
-        }
+        if (onComplete) onComplete(); else setStatus('idle');
     };
-    
     window.speechSynthesis.speak(utterance);
 }

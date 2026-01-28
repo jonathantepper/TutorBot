@@ -12,18 +12,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col bg-gray-50">
 
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10" aria-label="Main Navigation">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center gap-2">
-                    <i class="fas fa-chalkboard-teacher text-indigo-600 text-2xl"></i>
+                    <i class="fas fa-chalkboard-teacher text-indigo-600 text-2xl" aria-hidden="true"></i>
                     <h1 class="text-xl font-bold text-gray-900">AInterview <span class="text-indigo-600">Teacher</span></h1>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span id="user-display" class="text-sm text-gray-600 hidden"></span>
-                    <button id="auth-btn" class="text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition">
+                    <span id="user-display" class="text-sm text-gray-600 hidden" aria-live="polite"></span>
+                    <button id="auth-btn" class="text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                         Sign In
                     </button>
                 </div>
@@ -32,8 +32,9 @@
     </nav>
 
     <main class="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
         <div id="login-warning" class="text-center mt-20">
-            <i class="fas fa-lock text-6xl text-gray-300 mb-4"></i>
+            <i class="fas fa-lock text-6xl text-gray-300 mb-4" aria-hidden="true"></i>
             <h2 class="text-2xl font-bold text-gray-900">Teacher Access Only</h2>
             <p class="text-gray-500 mt-2">Please sign in to manage interviews.</p>
         </div>
@@ -41,44 +42,69 @@
         <div id="dashboard" class="hidden">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">Your Interviews</h2>
-                <button id="create-new-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-2">
-                    <i class="fas fa-plus"></i> Create New
+                <button id="create-new-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-plus" aria-hidden="true"></i> Create New
                 </button>
             </div>
-            <div id="interview-list" class="flex flex-col gap-3"></div>
+            
+            <div id="interview-list" class="flex flex-col gap-3" role="list">
+                </div>
         </div>
     </main>
 
-    <div id="create-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div id="create-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" aria-modal="true" role="dialog" aria-labelledby="create-title">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 class="text-xl font-bold text-gray-900">Create Assessment</h3>
-                <button id="close-create-btn" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                <h3 id="create-title" class="text-xl font-bold text-gray-900">Create Assessment</h3>
+                <button id="close-create-btn" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400" aria-label="Close Modal">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
             </div>
+            
             <div class="p-6 overflow-y-auto modal-scroll">
-                <div class="space-y-4">
+                <div class="space-y-5">
+                    
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <label for="input-title" class="block text-sm font-medium text-gray-700 mb-1">Assessment Title</label>
                         <input type="text" id="input-title" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g., Hamlet Act 1">
                     </div>
+
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">PDF Template</label>
-                        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer">
-                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                            <p class="text-sm text-gray-500" id="file-name-display">Click to upload PDF</p>
-                            <input type="file" id="pdf-upload" accept="application/pdf" class="hidden">
+                        <label for="time-limit-select" class="block text-sm font-medium text-gray-700 mb-1">Time Limit</label>
+                        <div class="relative">
+                            <select id="time-limit-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none bg-white cursor-pointer">
+                                <option value="0">No Limit (Relaxed)</option>
+                                <option value="5">5 Minutes (Quick Check)</option>
+                                <option value="10" selected>10 Minutes (Standard)</option>
+                                <option value="15">15 Minutes (Extended)</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
+                            </div>
                         </div>
                     </div>
+
+                    <div>
+                        <span class="block text-sm font-medium text-gray-700 mb-1">PDF Template</span>
+                        
+                        <label id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer block w-full focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2" aria-hidden="true"></i>
+                            <p class="text-sm text-gray-500" id="file-name-display">Click to upload PDF</p>
+                            <input type="file" id="pdf-upload" accept="application/pdf" class="hidden">
+                        </label>
+                    </div>
+
                 </div>
             </div>
+
             <div class="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                <button id="cancel-create-btn" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg">Cancel</button>
-                <button id="save-btn" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm">Create</button>
+                <button id="cancel-create-btn" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400">Cancel</button>
+                <button id="save-btn" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Create</button>
             </div>
         </div>
     </div>
 
-    <div id="submissions-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div id="submissions-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" aria-modal="true" role="dialog" aria-labelledby="submission-modal-title">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 overflow-hidden flex flex-col max-h-[85vh]">
             <div class="p-6 border-b border-gray-100 bg-indigo-50 flex justify-between items-center">
                 <div>
@@ -86,26 +112,30 @@
                     <p class="text-sm text-indigo-600" id="submission-modal-code">Code: ---</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button id="download-all-btn" class="hidden px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-2 transition">
-                        <i class="fas fa-file-archive"></i> Download All (ZIP)
+                    <button id="download-all-btn" class="hidden px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-2 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        <i class="fas fa-file-archive" aria-hidden="true"></i> Download All (ZIP)
                     </button>
-                    <button id="close-submissions-btn" class="text-indigo-400 hover:text-indigo-700"><i class="fas fa-times text-xl"></i></button>
+                    <button id="close-submissions-btn" class="text-indigo-400 hover:text-indigo-700 p-2 rounded-full hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400" aria-label="Close Submissions">
+                        <i class="fas fa-times text-xl" aria-hidden="true"></i>
+                    </button>
                 </div>
             </div>
-            <div id="submissions-list" class="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-3 modal-scroll"></div>
+            <div id="submissions-list" class="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-3 modal-scroll" role="list"></div>
         </div>
     </div>
 
-    <div id="transcript-viewer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden">
+    <div id="transcript-viewer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden" aria-modal="true" role="dialog" aria-labelledby="viewer-student-name">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col h-[80vh]">
             <div class="p-4 border-b border-gray-200 flex justify-between items-center">
                 <div>
                     <h4 class="font-bold text-gray-800" id="viewer-student-name">Student Name</h4>
                     <p class="text-xs text-gray-500" id="viewer-date">Date</p>
                 </div>
-                <button id="close-viewer-btn" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                <button id="close-viewer-btn" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400" aria-label="Close Viewer">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
             </div>
-            <div id="transcript-content" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white modal-scroll"></div>
+            <div id="transcript-content" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white modal-scroll" tabindex="0"></div>
         </div>
     </div>
 
