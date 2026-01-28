@@ -47,8 +47,7 @@
                 </button>
             </div>
             
-            <div id="interview-list" class="flex flex-col gap-3" role="list">
-                </div>
+            <div id="interview-list" class="flex flex-col gap-3" role="list"></div>
         </div>
     </main>
 
@@ -74,6 +73,7 @@
                         <div class="relative">
                             <select id="time-limit-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none bg-white cursor-pointer">
                                 <option value="0">No Limit (Relaxed)</option>
+                                <option value="3">3 Minutes (Sprint)</option>
                                 <option value="5">5 Minutes (Quick Check)</option>
                                 <option value="10" selected>10 Minutes (Standard)</option>
                                 <option value="15">15 Minutes (Extended)</option>
@@ -86,7 +86,6 @@
 
                     <div>
                         <span class="block text-sm font-medium text-gray-700 mb-1">PDF Template</span>
-                        
                         <label id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer block w-full focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
                             <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2" aria-hidden="true"></i>
                             <p class="text-sm text-gray-500" id="file-name-display">Click to upload PDF</p>

@@ -136,7 +136,7 @@ async function handleAuthButton() {
     }
 }
 
-// --- TEAM MANAGEMENT (NEW) ---
+// --- TEAM MANAGEMENT ---
 
 async function openTeamModal() {
     document.getElementById('team-modal').classList.remove('hidden');
@@ -242,7 +242,7 @@ window.removeUser = async (email) => {
 };
 
 
-// --- DATA LOADING (EXISTING LOGIC) ---
+// --- DATA LOADING ---
 async function loadData() {
     const container = document.getElementById('teacher-list');
     container.innerHTML = '<div class="text-center py-12"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div><p class="text-gray-500">Loading data...</p></div>';
@@ -296,7 +296,7 @@ async function loadData() {
     }
 }
 
-// --- UI RENDERING (EXISTING LOGIC) ---
+// --- UI RENDERING ---
 function renderTeachersByDomain(teachersMap) {
     const container = document.getElementById('teacher-list');
     container.innerHTML = '';
@@ -363,12 +363,18 @@ function renderTeachersByDomain(teachersMap) {
             teacher.interviews.forEach(interview => {
                 const interviewDate = interview.timestamp ? new Date(interview.timestamp.toDate()).toLocaleString() : 'N/A';
                 
+                // NEW: Time Limit Badge logic (Consistent with Teacher Dashboard)
+                const timeBadge = (interview.timeLimit && interview.timeLimit > 0)
+                    ? `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded ml-2 border border-blue-200"><i class="far fa-clock"></i> ${interview.timeLimit}m</span>`
+                    : `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded ml-2 border border-gray-200"><i class="fas fa-infinity"></i> No Limit</span>`;
+
                 html += `
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-100 p-3 rounded-lg hover:border-indigo-200 transition group">
                         <div class="flex-1 mb-2 sm:mb-0">
                             <div class="flex items-center gap-2">
                                 <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-mono font-bold px-2 py-0.5 rounded border border-indigo-100">${interview.code || interview.id}</span>
                                 <span class="text-gray-800 font-medium text-sm group-hover:text-indigo-700 transition">${interview.title}</span>
+                                ${timeBadge}
                             </div>
                             <span class="text-gray-400 text-xs block mt-1 ml-1"><i class="far fa-clock mr-1"></i>${interviewDate}</span>
                         </div>
@@ -397,7 +403,7 @@ function renderTeachersByDomain(teachersMap) {
 }
 
 // --- ACTIONS (Unchanged) ---
-// 1. UPDATED: View List of Students (Now with "Read Chat" button)
+// 1. View List of Students (Now with "Read Chat" button)
 window.viewTranscripts = async (interviewId) => {
     const container = document.getElementById(`students-${interviewId}`);
     
@@ -460,7 +466,7 @@ window.viewTranscripts = async (interviewId) => {
     }
 };
 
-// 2. NEW: Open the Chat Window
+// 2. Open the Chat Window
 window.openTranscriptModal = async (transcriptId) => {
     const modal = document.getElementById('transcript-modal');
     const content = document.getElementById('modal-content');

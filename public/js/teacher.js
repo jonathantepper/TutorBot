@@ -31,11 +31,8 @@ function initApp() {
     document.getElementById('close-submissions-btn').addEventListener('click', closeSubmissionsModal);
     document.getElementById('close-viewer-btn').addEventListener('click', closeTranscriptViewer);
 
-    // File Upload Area
+    // File Upload Area (Now using Label, so no click listener needed on dropZone)
     const fileInput = document.getElementById('pdf-upload');
-    
-    // REMOVED: dropZone.addEventListener('click'...) -> The HTML <label> handles this now!
-    
     fileInput.addEventListener('change', (e) => handleFileSelect(e.target));
 }
 
@@ -92,7 +89,7 @@ async function loadInterviews() {
         const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : 'N/A';
         const safeTitle = data.title.replace(/'/g, "\\'");
         
-        // NEW: Check if there is a time limit and create a badge
+        // NEW: Time Limit Badge logic
         const timeBadge = (data.timeLimit && data.timeLimit > 0)
             ? `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded ml-2 border border-blue-200"><i class="far fa-clock"></i> ${data.timeLimit}m</span>`
             : `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded ml-2 border border-gray-200"><i class="fas fa-infinity"></i> No Limit</span>`;
@@ -231,7 +228,6 @@ window.openSubmissionsList = async (code, title) => {
     
     const downloadAllBtn = document.getElementById('download-all-btn');
     downloadAllBtn.classList.remove('hidden');
-    // Using a closure to pass arguments
     downloadAllBtn.onclick = () => downloadAllTranscripts(code, title);
     
     const container = document.getElementById('submissions-list');
