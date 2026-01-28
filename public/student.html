@@ -56,7 +56,7 @@
                 </div>
                 <h1 class="text-xl font-bold text-gray-900 mb-2">Student Login</h1>
                 <p class="text-sm text-gray-500 mb-6">Sign in to start your interview.</p>
-                <button id="google-signin-btn" class="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm">
+                <button type="button" id="google-signin-btn" title="Sign in with your Google Account" class="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm">
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
                     Sign in with Google
                 </button>
@@ -75,7 +75,7 @@
                 <input type="text" id="interview-code" maxlength="5" placeholder="ABCDE" 
                     class="w-full text-center text-3xl tracking-[0.5em] font-mono uppercase border border-gray-200 rounded-xl py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder:tracking-normal">
                 
-                <button id="start-interview-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition-all shadow-md shadow-indigo-200 mt-2">
+                <button type="button" id="start-interview-btn" title="Start the interview session" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition-all shadow-md shadow-indigo-200 mt-2">
                     Start Interview
                 </button>
                 <p id="code-error" class="text-red-500 text-xs hidden"></p>
@@ -107,7 +107,7 @@
                         <canvas id="audio-visualizer" width="300" height="30" class="w-full max-w-[200px] mb-3 opacity-80 h-[30px]"></canvas>
 
                         <div class="relative">
-                            <button id="record-btn" class="relative group w-16 h-16 rounded-full bg-indigo-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center">
+                            <button type="button" id="record-btn" title="Press to start or stop recording" aria-label="Toggle Recording" class="relative group w-16 h-16 rounded-full bg-indigo-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center">
                                 <i class="fas fa-microphone text-2xl"></i>
                             </button>
                             <span class="absolute top-0 left-0 w-full h-full rounded-full bg-indigo-400 opacity-20 animate-ping hidden group-hover:block"></span>
@@ -118,10 +118,10 @@
                         <textarea id="draft-input" rows="3" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" placeholder="Your answer..."></textarea>
                         
                         <div class="flex gap-3">
-                            <button id="retry-btn" class="flex-1 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-3 rounded-lg text-sm font-medium transition-colors">
+                            <button type="button" id="retry-btn" title="Discard draft and try again" class="flex-1 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 py-3 rounded-lg text-sm font-medium transition-colors">
                                 <i class="fas fa-undo mr-1"></i> Retry
                             </button>
-                            <button id="submit-btn" class="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg text-sm font-medium shadow-md shadow-indigo-100 transition-colors">
+                            <button type="button" id="submit-btn" title="Submit your answer" class="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg text-sm font-medium shadow-md shadow-indigo-100 transition-colors">
                                 <i class="fas fa-paper-plane mr-1"></i> Submit
                             </button>
                         </div>
@@ -147,7 +147,7 @@
             </div>
             <h3 id="modal-title" class="text-lg font-bold text-gray-900 mb-2">Error</h3>
             <p id="modal-message" class="text-sm text-gray-500 mb-6">Something went wrong.</p>
-            <button id="close-modal-btn" class="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-2.5 rounded-xl transition-colors">
+            <button type="button" id="close-modal-btn" title="Close this alert" class="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-2.5 rounded-xl transition-colors">
                 Okay
             </button>
         </div>
