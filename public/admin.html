@@ -66,7 +66,7 @@
                     <h3 class="text-lg font-bold text-gray-900">Manage Access</h3>
                     <p class="text-xs text-gray-500">Control who can access this dashboard</p>
                 </div>
-                <button id="close-team-modal" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+                <button id="close-team-modal" class="text-gray-400 hover:text-gray-600" aria-label="Close Team Modal"><i class="fas fa-times text-xl"></i></button>
             </div>
             
             <div class="p-6 overflow-y-auto">
@@ -74,7 +74,7 @@
                     <h4 class="text-sm font-bold text-indigo-900 mb-3"><i class="fas fa-user-plus mr-1"></i> Add New User</h4>
                     <div class="flex flex-col sm:flex-row gap-2">
                         <input type="email" id="new-user-email" placeholder="email@school.edu" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                        <select id="new-user-role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <select id="new-user-role" aria-label="Select User Role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
                             <option value="manager">Manager</option>
                             <option value="admin">Super Admin</option>
                         </select>
@@ -102,7 +102,7 @@
                     <h3 class="text-lg font-bold text-gray-800" id="modal-student-name">Student Name</h3>
                     <p class="text-xs text-gray-500" id="modal-topic">Topic</p>
                 </div>
-                <button onclick="document.getElementById('transcript-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition">
+                <button onclick="document.getElementById('transcript-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition" aria-label="Close Transcript Modal">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
