@@ -153,21 +153,35 @@ async function loadAuthorizedUsers() {
         
         listEl.innerHTML = '';
         
-        // Owner (Static)
+        // --- 1. HANDLE OWNER (Dynamic Checkbox, Static Delete) ---
+        // Find owner data in the snapshot if it exists
+        const ownerDoc = snapshot.docs.find(d => d.id === OWNER_EMAIL.toLowerCase());
+        const ownerAudioEnabled = ownerDoc ? ownerDoc.data().canRecordAudio : false;
+        const ownerChecked = ownerAudioEnabled ? 'checked' : '';
+
         const ownerDiv = document.createElement('div');
-        ownerDiv.className = "flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100";
+        ownerDiv.className = "flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 mb-2";
         ownerDiv.innerHTML = `
             <div>
                 <span class="font-bold text-gray-800">${OWNER_EMAIL}</span>
                 <span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">Owner</span>
             </div>
-            <span class="text-xs text-gray-400"><i class="fas fa-lock"></i> Protected</span>
+            <div class="flex items-center gap-4">
+                 <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-600 hover:text-indigo-600" title="Enable testing for Owner">
+                    <input type="checkbox" onchange="toggleAudioPermission('${OWNER_EMAIL}', this.checked)" ${ownerChecked} class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                    <i class="fas fa-microphone"></i> Rec
+                </label>
+                <span class="text-xs text-gray-400 flex items-center gap-1"><i class="fas fa-lock"></i> Protected</span>
+            </div>
         `;
         listEl.appendChild(ownerDiv);
 
+        // --- 2. HANDLE OTHER USERS ---
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
             const email = docSnap.id;
+            
+            // Skip owner (already rendered above)
             if (email === OWNER_EMAIL.toLowerCase()) return;
 
             const row = document.createElement('div');
@@ -176,20 +190,23 @@ async function loadAuthorizedUsers() {
             const badgeColor = data.role === 'admin' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
             const badgeLabel = data.role === 'admin' ? 'Admin' : 'Manager';
             
-            // NEW: Check for Audio Permission
-            const audioBadge = data.canRecordAudio 
-                ? `<span class="ml-2 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Audio Recording Enabled"><i class="fas fa-microphone"></i> Rec</span>` 
-                : '';
+            // AUDIO PERMISSION CHECKBOX
+            const isChecked = data.canRecordAudio ? 'checked' : '';
 
             row.innerHTML = `
                 <div>
                     <span class="font-medium text-gray-800">${email}</span>
                     <span class="ml-2 text-xs ${badgeColor} px-2 py-0.5 rounded-full capitalize">${badgeLabel}</span>
-                    ${audioBadge}
                 </div>
-                <button onclick="removeUser('${email}')" class="text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-600 hover:text-indigo-600">
+                        <input type="checkbox" onchange="toggleAudioPermission('${email}', this.checked)" ${isChecked} class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                        <i class="fas fa-microphone"></i> Rec
+                    </label>
+                    <button onclick="removeUser('${email}')" class="text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
             `;
             listEl.appendChild(row);
         });
@@ -203,7 +220,7 @@ async function loadAuthorizedUsers() {
 async function addNewUser() {
     const emailInput = document.getElementById('new-user-email');
     const roleSelect = document.getElementById('new-user-role');
-    const audioCheck = document.getElementById('new-user-audio'); // NEW
+    const audioCheck = document.getElementById('new-user-audio');
     const btn = document.getElementById('add-user-btn');
 
     const email = emailInput.value.trim().toLowerCase();
@@ -220,13 +237,13 @@ async function addNewUser() {
     try {
         await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, email), {
             role: role,
-            canRecordAudio: audioCheck.checked, // NEW: Save permission
+            canRecordAudio: audioCheck.checked, // Save initial permission
             addedBy: auth.currentUser.email,
             timestamp: new Date()
         });
         
         emailInput.value = '';
-        audioCheck.checked = false; // Reset checkbox
+        audioCheck.checked = false; 
         loadAuthorizedUsers(); 
     } catch (e) {
         alert("Error adding user: " + e.message);
@@ -236,13 +253,28 @@ async function addNewUser() {
     }
 }
 
-// Make removeUser globally accessible for the onclick event
+// NEW: Toggle Audio Permission for Existing Users
+window.toggleAudioPermission = async (email, isEnabled) => {
+    try {
+        // We use setDoc with {merge: true} to update just the one field without overwriting the role
+        await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, email), {
+            canRecordAudio: isEnabled
+        }, { merge: true });
+        
+        console.log(`Updated audio permission for ${email} to ${isEnabled}`);
+    } catch (e) {
+        alert("Error updating permission: " + e.message);
+        // Revert checkbox if failed (optional, but good UX)
+        loadAuthorizedUsers();
+    }
+};
+
 window.removeUser = async (email) => {
     if (!confirm(`Are you sure you want to remove access for ${email}?`)) return;
 
     try {
         await deleteDoc(doc(db, `artifacts/${appId}/public/data/roles`, email));
-        loadAuthorizedUsers(); // Refresh list
+        loadAuthorizedUsers(); 
     } catch (e) {
         alert("Error removing user: " + e.message);
     }
@@ -370,10 +402,15 @@ function renderTeachersByDomain(teachersMap) {
             teacher.interviews.forEach(interview => {
                 const interviewDate = interview.timestamp ? new Date(interview.timestamp.toDate()).toLocaleString() : 'N/A';
                 
-                // NEW: Time Limit Badge logic (Consistent with Teacher Dashboard)
+                // TIME LIMIT BADGE
                 const timeBadge = (interview.timeLimit && interview.timeLimit > 0)
                     ? `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded ml-2 border border-blue-200"><i class="far fa-clock"></i> ${interview.timeLimit}m</span>`
                     : `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded ml-2 border border-gray-200"><i class="fas fa-infinity"></i> No Limit</span>`;
+                
+                // RECORDING BADGE
+                const recBadge = (interview.recordAudio)
+                     ? `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded ml-2 border border-red-200"><i class="fas fa-microphone"></i> Rec</span>`
+                     : ``;
 
                 html += `
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-100 p-3 rounded-lg hover:border-indigo-200 transition group">
@@ -382,6 +419,7 @@ function renderTeachersByDomain(teachersMap) {
                                 <span class="inline-block bg-indigo-50 text-indigo-700 text-xs font-mono font-bold px-2 py-0.5 rounded border border-indigo-100">${interview.code || interview.id}</span>
                                 <span class="text-gray-800 font-medium text-sm group-hover:text-indigo-700 transition">${interview.title}</span>
                                 ${timeBadge}
+                                ${recBadge}
                             </div>
                             <span class="text-gray-400 text-xs block mt-1 ml-1"><i class="far fa-clock mr-1"></i>${interviewDate}</span>
                         </div>

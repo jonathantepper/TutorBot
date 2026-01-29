@@ -1,6 +1,6 @@
 import { 
     db, auth, storage, 
-    collection, query, where, getDocs, doc, deleteDoc, orderBy, serverTimestamp, setDoc, 
+    collection, query, where, getDocs, getDoc, doc, deleteDoc, orderBy, serverTimestamp, setDoc, 
     signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, 
     ref, uploadBytes, getDownloadURL, isLocalHost 
 } from './config.js';
@@ -10,6 +10,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 const appId = 'default-app-id';
 let currentUser, pdfTextContent = "";
+let canRecordAudio = false; // Default permission
 
 // --- INITIALIZATION ---
 window.onload = initApp;
@@ -31,24 +32,40 @@ function initApp() {
     document.getElementById('close-submissions-btn').addEventListener('click', closeSubmissionsModal);
     document.getElementById('close-viewer-btn').addEventListener('click', closeTranscriptViewer);
 
-    // File Upload Area (Now using Label, so no click listener needed on dropZone)
+    // File Upload Area
     const fileInput = document.getElementById('pdf-upload');
     fileInput.addEventListener('change', (e) => handleFileSelect(e.target));
 }
 
-function updateUIForUser(user) {
+async function updateUIForUser(user) {
     if (user) {
         document.getElementById('login-warning').classList.add('hidden');
         document.getElementById('dashboard').classList.remove('hidden');
         document.getElementById('user-display').textContent = user.displayName || user.email;
         document.getElementById('user-display').classList.remove('hidden');
         document.getElementById('auth-btn').textContent = 'Sign Out';
+        
+        // --- NEW: Check Audio Permissions ---
+        try {
+            const roleDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/roles`, user.email.toLowerCase()));
+            if (roleDoc.exists() && roleDoc.data().canRecordAudio) {
+                canRecordAudio = true;
+            } else {
+                canRecordAudio = false;
+            }
+        } catch (e) {
+            console.warn("Could not fetch permissions", e);
+            canRecordAudio = false;
+        }
+        // ------------------------------------
+
         setTimeout(loadInterviews, 100);
     } else {
         document.getElementById('login-warning').classList.remove('hidden');
         document.getElementById('dashboard').classList.add('hidden');
         document.getElementById('user-display').classList.add('hidden');
         document.getElementById('auth-btn').textContent = 'Sign In';
+        canRecordAudio = false;
     }
 }
 
@@ -89,10 +106,15 @@ async function loadInterviews() {
         const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : 'N/A';
         const safeTitle = data.title.replace(/'/g, "\\'");
         
-        // NEW: Time Limit Badge logic
+        // Time Limit Badge
         const timeBadge = (data.timeLimit && data.timeLimit > 0)
             ? `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded ml-2 border border-blue-200"><i class="far fa-clock"></i> ${data.timeLimit}m</span>`
             : `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded ml-2 border border-gray-200"><i class="fas fa-infinity"></i> No Limit</span>`;
+
+        // Audio Badge
+        const recBadge = (data.recordAudio)
+             ? `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded ml-2 border border-red-200"><i class="fas fa-microphone"></i> Rec</span>`
+             : ``;
 
         const row = document.createElement('div');
         row.className = "bg-white p-4 rounded-lg border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 hover:shadow-md transition group";
@@ -103,6 +125,7 @@ async function loadInterviews() {
                     <h3 class="text-lg font-bold text-gray-900 truncate">${data.title}</h3>
                     <span class="bg-indigo-100 text-indigo-700 text-xs font-mono font-bold px-2 py-1 rounded border border-indigo-200">${data.code}</span>
                     ${timeBadge}
+                    ${recBadge}
                 </div>
                 <p class="text-xs text-gray-500 flex items-center justify-center sm:justify-start gap-1">
                     <i class="far fa-calendar-alt"></i> Created: ${date}
@@ -151,7 +174,8 @@ async function handleFileSelect(input) {
 async function saveInterview() {
     const title = document.getElementById('input-title').value;
     const fileInput = document.getElementById('pdf-upload');
-    const timeSelect = document.getElementById('time-limit-select'); // NEW: Grab the dropdown
+    const timeSelect = document.getElementById('time-limit-select');
+    const audioToggle = document.getElementById('record-audio-toggle'); // Get element
     const file = fileInput.files[0];
 
     if (!title || !pdfTextContent || !file) {
@@ -171,7 +195,7 @@ async function saveInterview() {
         const snapshot = await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(snapshot.ref);
 
-        // 2. Save Metadata (Include Time Limit)
+        // 2. Save Metadata
         await setDoc(doc(db, `artifacts/${appId}/public/data/interviews`, code), {
             title: title,
             curriculumText: pdfTextContent,
@@ -180,7 +204,8 @@ async function saveInterview() {
             teacherName: currentUser.displayName,
             teacherEmail: currentUser.email,
             timestamp: serverTimestamp(),
-            timeLimit: parseInt(timeSelect.value) || 0 // <--- THIS SAVES THE TIME!
+            timeLimit: parseInt(timeSelect.value) || 0,
+            recordAudio: audioToggle ? audioToggle.checked : false // Save choice
         });
 
         closeCreateModal();
@@ -196,7 +221,21 @@ async function saveInterview() {
     }
 }
 
-// --- GLOBAL EXPORTS (Attached to Window for HTML calls) ---
+// --- WINDOW FUNCTIONS ---
+window.openCreateModal = () => {
+    document.getElementById('create-modal').classList.remove('hidden');
+    
+    // Check permission before showing toggle
+    const audioContainer = document.getElementById('audio-permission-container');
+    if (canRecordAudio) {
+        audioContainer.classList.remove('hidden');
+    } else {
+        audioContainer.classList.add('hidden');
+        document.getElementById('record-audio-toggle').checked = false; 
+    }
+};
+
+// ... (Rest of the window exports remain the same as before) ...
 window.deleteInterview = async (code) => {
     if (!confirm("Delete this interview and all student transcripts?")) return;
     try {
@@ -290,7 +329,17 @@ window.openSubmissionsList = async (code, title) => {
     }
 };
 
-window.openCreateModal = () => document.getElementById('create-modal').classList.remove('hidden');
+window.openCreateModal = () => {
+    document.getElementById('create-modal').classList.remove('hidden');
+    // Check permission logic again just in case
+    const audioContainer = document.getElementById('audio-permission-container');
+    if (canRecordAudio) {
+        audioContainer.classList.remove('hidden');
+    } else {
+        audioContainer.classList.add('hidden');
+        document.getElementById('record-audio-toggle').checked = false; 
+    }
+};
 
 // --- HELPER FUNCTIONS (Internal) ---
 function closeCreateModal() {
