@@ -1,6 +1,7 @@
 import { 
-    db, auth, collection, doc, getDoc, setDoc, serverTimestamp, 
+    db, auth, storage, collection, doc, getDoc, setDoc, serverTimestamp, 
     signInWithPopup, GoogleAuthProvider, onAuthStateChanged, 
+    ref, uploadBytes, getDownloadURL, 
     isLocalHost, app 
 } from './config.js';
 
@@ -26,7 +27,12 @@ let isAuthReady = false;
 let interviewTurnCount = 0; 
 let mediaStream = null;
 let timerInterval = null;
-let isInterviewExpired = false; // NEW: Global Lock Flag
+let isInterviewExpired = false;
+
+// --- AUDIO RECORDING STATE ---
+let mediaRecorder = null;
+let audioChunks = [];
+let currentAudioBlob = null;
 
 // --- DYNAMIC SYSTEM PROMPT GENERATOR ---
 function generateSystemPrompt(timeLimit) {
@@ -118,6 +124,12 @@ function initApp() {
     document.getElementById('record-btn').addEventListener('click', toggleRecording);
     document.getElementById('retry-btn').addEventListener('click', handleRetry);
     document.getElementById('submit-btn').addEventListener('click', submitResponse);
+    
+    // Consent Modal Button
+    document.getElementById('consent-btn').addEventListener('click', () => {
+        document.getElementById('consent-modal').classList.add('hidden');
+        beginSessionLogic(); // Actually start after consent
+    });
 
     if (window.speechSynthesis) {
         window.speechSynthesis.getVoices();
@@ -257,11 +269,32 @@ async function startInterviewSession() {
 
         interviewData = docSnap.data();
         interviewData.code = code;
+        
+        // --- CHECK RECORDING PERMISSION ---
+        if (interviewData.recordAudio) {
+            hideLoading();
+            document.getElementById('consent-modal').classList.remove('hidden');
+            // Wait for user to click "I Agree" button in modal
+        } else {
+            beginSessionLogic();
+        }
+
+    } catch (e) {
+        codeError.textContent = e.message;
+        codeError.style.display = 'block';
+        hideLoading();
+    }
+}
+
+async function beginSessionLogic() {
+    showLoading('Initializing...');
+    
+    try {
         transcriptDocRef = doc(collection(db, `artifacts/${appId}/public/data/interview_transcripts`));
 
         document.getElementById('topic-title-display').textContent = interviewData.title;
         document.getElementById('teacher-id-display').textContent = `Interviewer: ${interviewData.teacherName || 'Teacher'}`;
-        document.getElementById('code-display').textContent = code;
+        document.getElementById('code-display').textContent = interviewData.code;
         
         document.getElementById('app-header').classList.remove('hidden');
         document.getElementById('app-header').classList.add('flex');
@@ -279,10 +312,8 @@ async function startInterviewSession() {
         document.getElementById('record-btn').disabled = false;
         
         await getGeminiResponse();
-
     } catch (e) {
-        codeError.textContent = e.message;
-        codeError.style.display = 'block';
+        showModal("Error", e.message);
     } finally {
         hideLoading();
     }
@@ -458,17 +489,31 @@ function initSpeechToText() {
             isRecording = true; 
             setStatus('listening'); 
             draftInput.value = ''; 
+            
             try {
+                // Reuse the same stream for visualizer and recording
                 mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 initVisualizer(mediaStream);
+                
+                // --- START AUDIO CAPTURE (If Enabled) ---
+                if (interviewData.recordAudio) {
+                    startAudioCapture(mediaStream);
+                }
+                
             } catch (e) {
-                console.warn("Visualizer failed to start", e);
+                console.warn("Media stream failed", e);
             }
         };
         
         recognition.onend = () => {
             isRecording = false;
             stopVisualizer();
+            
+            // --- STOP AUDIO CAPTURE ---
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop());
                 mediaStream = null;
@@ -494,8 +539,26 @@ function initSpeechToText() {
     }
 }
 
+// --- NEW AUDIO CAPTURE FUNCTIONS ---
+function startAudioCapture(stream) {
+    audioChunks = [];
+    currentAudioBlob = null;
+    try {
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) audioChunks.push(event.data);
+        };
+        mediaRecorder.onstop = () => {
+            currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        };
+        mediaRecorder.start();
+        console.log("🎙️ Audio capture started");
+    } catch (e) {
+        console.error("MediaRecorder failed:", e);
+    }
+}
+
 function startRecording() {
-    // --- LOCKOUT CHECK ---
     if (isInterviewExpired) {
         console.log("Timer expired. Microphone auto-start blocked.");
         return;
@@ -509,14 +572,13 @@ function startRecording() {
 }
 
 function toggleRecording() {
-    // --- LOCKOUT CHECK ---
     if (isInterviewExpired) return;
-    
     isRecording ? recognition.stop() : recognition.start();
 }
 
 function handleRetry() {
     draftInput.value = ''; 
+    currentAudioBlob = null; // Discard audio
     setStatus('listening'); 
     startRecording();
 }
@@ -536,9 +598,35 @@ function formatAndShowDraft() {
 async function submitResponse() {
     const text = draftInput.value.trim();
     if (!text) return;
+    
+    // Disable submit to prevent double clicks
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('submit-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    // --- UPLOAD AUDIO (If Exists) ---
+    let audioUrl = null;
+    if (currentAudioBlob && interviewData.recordAudio) {
+        try {
+            const filename = `${new Date().getTime()}.webm`;
+            const audioRef = ref(storage, `student_audio/${interviewData.code}/${userId}/${filename}`);
+            const snapshot = await uploadBytes(audioRef, currentAudioBlob);
+            audioUrl = await getDownloadURL(snapshot.ref);
+            console.log("Audio uploaded:", audioUrl);
+        } catch (e) {
+            console.error("Audio upload failed:", e);
+            // We continue anyway, saving just the text
+        }
+    }
+
     setStatus('thinking');
     addMessageToChat('Student', text);
-    updateTranscript('user', text);
+    
+    // Pass audioUrl to updateTranscript
+    updateTranscript('user', text, audioUrl);
+    
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-btn').innerHTML = '<i class="fas fa-paper-plane mr-1"></i> Submit';
+    
     await getGeminiResponse();
 }
 
@@ -577,9 +665,22 @@ function removeTypingIndicator() {
     if (el) el.remove();
 }
 
-function updateTranscript(role, text) {
+function updateTranscript(role, text, audioUrl = null) {
     if (!text) return;
-    transcript.push({ role: role.toLowerCase(), text: text, timestamp: new Date().toISOString() });
+    
+    const entry = { 
+        role: role.toLowerCase(), 
+        text: text, 
+        timestamp: new Date().toISOString() 
+    };
+
+    // Attach audio URL if it exists (only for user turns)
+    if (audioUrl) {
+        entry.audioUrl = audioUrl;
+    }
+
+    transcript.push(entry);
+    
     if (transcriptDocRef) {
         setDoc(transcriptDocRef, {
             fullTranscript: transcript, timestamp: serverTimestamp(),
