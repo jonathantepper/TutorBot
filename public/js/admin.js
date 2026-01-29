@@ -153,7 +153,7 @@ async function loadAuthorizedUsers() {
         
         listEl.innerHTML = '';
         
-        // Add Owner manually to list (visual only)
+        // Owner (Static)
         const ownerDiv = document.createElement('div');
         ownerDiv.className = "flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100";
         ownerDiv.innerHTML = `
@@ -168,8 +168,6 @@ async function loadAuthorizedUsers() {
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
             const email = docSnap.id;
-            
-            // Skip owner if they are also in DB (to avoid duplicates)
             if (email === OWNER_EMAIL.toLowerCase()) return;
 
             const row = document.createElement('div');
@@ -177,11 +175,17 @@ async function loadAuthorizedUsers() {
             
             const badgeColor = data.role === 'admin' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
             const badgeLabel = data.role === 'admin' ? 'Admin' : 'Manager';
+            
+            // NEW: Check for Audio Permission
+            const audioBadge = data.canRecordAudio 
+                ? `<span class="ml-2 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Audio Recording Enabled"><i class="fas fa-microphone"></i> Rec</span>` 
+                : '';
 
             row.innerHTML = `
                 <div>
                     <span class="font-medium text-gray-800">${email}</span>
                     <span class="ml-2 text-xs ${badgeColor} px-2 py-0.5 rounded-full capitalize">${badgeLabel}</span>
+                    ${audioBadge}
                 </div>
                 <button onclick="removeUser('${email}')" class="text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition">
                     <i class="fas fa-trash-alt"></i>
@@ -199,6 +203,7 @@ async function loadAuthorizedUsers() {
 async function addNewUser() {
     const emailInput = document.getElementById('new-user-email');
     const roleSelect = document.getElementById('new-user-role');
+    const audioCheck = document.getElementById('new-user-audio'); // NEW
     const btn = document.getElementById('add-user-btn');
 
     const email = emailInput.value.trim().toLowerCase();
@@ -215,12 +220,14 @@ async function addNewUser() {
     try {
         await setDoc(doc(db, `artifacts/${appId}/public/data/roles`, email), {
             role: role,
+            canRecordAudio: audioCheck.checked, // NEW: Save permission
             addedBy: auth.currentUser.email,
             timestamp: new Date()
         });
         
         emailInput.value = '';
-        loadAuthorizedUsers(); // Refresh list
+        audioCheck.checked = false; // Reset checkbox
+        loadAuthorizedUsers(); 
     } catch (e) {
         alert("Error adding user: " + e.message);
     } finally {

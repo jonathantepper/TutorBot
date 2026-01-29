@@ -72,25 +72,36 @@
             <div class="p-6 overflow-y-auto">
                 <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
                     <h4 class="text-sm font-bold text-indigo-900 mb-3"><i class="fas fa-user-plus mr-1"></i> Add New User</h4>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input type="email" id="new-user-email" placeholder="email@school.edu" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                        <select id="new-user-role" aria-label="Select User Role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
-                            <option value="manager">Manager</option>
-                            <option value="admin">Super Admin</option>
-                        </select>
-                        <button id="add-user-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm whitespace-nowrap">
+                    
+                    <div class="flex flex-col gap-3">
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="email" id="new-user-email" placeholder="email@school.edu" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <select id="new-user-role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <option value="manager">Manager</option>
+                                <option value="admin">Super Admin</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="new-user-audio" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            <label for="new-user-audio" class="text-sm text-gray-700 flex items-center gap-1">
+                                Enable Audio Recording Features 
+                                <i class="fas fa-microphone text-gray-400 text-xs"></i>
+                            </label>
+                        </div>
+
+                        <button id="add-user-btn" class="self-start bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm whitespace-nowrap">
                             Add User
                         </button>
                     </div>
+                    
                     <p class="text-xs text-indigo-400 mt-2 ml-1">
                         * Managers can only see data from their own email domain.
                     </p>
                 </div>
 
-                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Authorized Users</h4>
-                <div id="authorized-users-list" class="space-y-2">
-                    <p class="text-center text-gray-400 py-4"><i class="fas fa-spinner fa-spin"></i> Loading users...</p>
-                </div>
+                <h4 class="text-sm font-bold text-gray-900 mb-3">Authorized Users</h4>
+                <div id="authorized-users-list" class="space-y-2"></div>
             </div>
         </div>
     </div>
