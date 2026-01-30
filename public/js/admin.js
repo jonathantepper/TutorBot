@@ -550,6 +550,20 @@ window.openTranscriptModal = async (transcriptId) => {
                     ? `<div class="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs shrink-0 mr-2"><i class="fas fa-robot"></i></div>`
                     : `<div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs shrink-0 ml-2"><i class="fas fa-user"></i></div>`;
 
+                // NEW: Audio Player HTML Generator
+                let audioHtml = '';
+                if (msg.audioUrl) {
+                    // Privacy: controlsList="nodownload" helps hide the download button
+                    audioHtml = `
+                        <div class="mt-3 pt-2 border-t ${isAi ? 'border-gray-200' : 'border-white/20'}">
+                            <div class="text-[10px] font-bold uppercase mb-1 opacity-75 flex items-center gap-1">
+                                <i class="fas fa-microphone"></i> Audio
+                            </div>
+                            <audio controls src="${msg.audioUrl}" controlsList="nodownload" class="w-full h-8 rounded opacity-90" style="${isAi ? '' : 'filter: invert(1) hue-rotate(180deg)'}"></audio>
+                        </div>
+                    `;
+                }
+
                 // Add to HTML
                 chatHtml += `
                     <div class="flex w-full ${align} mb-4">
@@ -559,6 +573,7 @@ window.openTranscriptModal = async (transcriptId) => {
                                 ${isAi ? 'Prompta' : 'Student'}
                             </div>
                             ${msg.text.replace(/\n/g, '<br>')}
+                            ${audioHtml} 
                         </div>
                         ${!isAi ? avatar : ''}
                     </div>
