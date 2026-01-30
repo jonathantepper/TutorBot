@@ -352,6 +352,7 @@ function closeTranscriptViewer() {
     document.getElementById('transcript-viewer-modal').classList.add('hidden');
 }
 
+// *New* If an audio link exists, it appends a sleek, compact audio player to the bottom of that chat bubble
 function openTranscriptViewer(name, date, transcriptArray) {
     document.getElementById('transcript-viewer-modal').classList.remove('hidden');
     document.getElementById('viewer-student-name').textContent = name;
@@ -366,17 +367,51 @@ function openTranscriptViewer(name, date, transcriptArray) {
 
     transcriptArray.forEach(turn => {
         const isAI = turn.role === 'model';
+        
+        // 1. Setup Wrapper
         const div = document.createElement('div');
         div.className = `flex ${isAI ? 'justify-start' : 'justify-end'}`;
+        
+        // 2. Setup Bubble
         const bubble = document.createElement('div');
         bubble.className = `max-w-[85%] p-4 rounded-xl text-sm leading-relaxed ${isAI ? 'bg-gray-100 text-gray-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`;
+        
+        // 3. Label (Name)
         const label = document.createElement('div');
         label.className = "text-xs font-bold mb-1 opacity-70";
         label.textContent = isAI ? "Prompta" : name;
+        
+        // 4. Text Content
         const text = document.createElement('div');
         text.innerHTML = turn.text.replace(/\n/g, '<br>');
+        
+        // Append basics
         bubble.appendChild(label);
         bubble.appendChild(text);
+
+        // 5. NEW: Audio Player (If URL exists)
+        if (turn.audioUrl) {
+            const audioContainer = document.createElement('div');
+            audioContainer.className = "mt-3 pt-2 border-t border-white/20"; // Subtle separator
+            
+            const audioLabel = document.createElement('div');
+            audioLabel.className = "text-[10px] font-bold uppercase mb-1 opacity-75 flex items-center gap-1";
+            audioLabel.innerHTML = '<i class="fas fa-microphone"></i> Recording';
+            
+            const audioPlayer = document.createElement('audio');
+            audioPlayer.controls = true;
+            audioPlayer.src = turn.audioUrl;
+            // PRIVACY FEATURE: This attempts to hide the download button
+            audioPlayer.setAttribute('controlsList', 'nodownload'); 
+            audioPlayer.className = "w-full h-8 opacity-90 rounded";
+            // Style tweak for the player to fit the bubble theme
+            audioPlayer.style.filter = isAI ? "" : "invert(1) hue-rotate(180deg)"; 
+
+            audioContainer.appendChild(audioLabel);
+            audioContainer.appendChild(audioPlayer);
+            bubble.appendChild(audioContainer);
+        }
+
         div.appendChild(bubble);
         container.appendChild(div);
     });
