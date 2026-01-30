@@ -3,204 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AInterview: AI Assessment Platform</title>
-    
+    <title>AInterview: Oral Assessments with AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-    <link rel="stylesheet" href="css/style.css">
-    
     <style>
-        .hero-bg {
-            background-color: #4f46e5;
-            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
+<body class="bg-white font-sans text-gray-900">
 
-    <nav class="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-robot text-indigo-600 text-2xl"></i>
-                    <span class="text-xl font-bold text-gray-900">AInterview</span>
-                </div>
-                <div class="text-sm font-medium text-gray-500">
-                    Putting AI into Oral Assessments
-                </div>
+    <nav class="border-b border-gray-100 sticky top-0 bg-white/90 backdrop-blur-md z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">AI</div>
+                <span class="font-bold text-xl tracking-tight">AInterview</span>
+            </div>
+            <div class="flex items-center gap-6">
+                <button onclick="document.getElementById('changelog-modal').classList.remove('hidden')" class="text-sm text-gray-500 hover:text-indigo-600 transition underline decoration-dotted underline-offset-4">
+                    What's New?
+                </button>
+                <a href="teacher.html" class="text-sm font-medium text-gray-600 hover:text-indigo-600 transition">Teacher Login</a>
+                <a href="student.html" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                    Student Access
+                </a>
             </div>
         </div>
     </nav>
 
-    <header class="hero-bg text-white py-20">
-        <div class="max-w-5xl mx-auto px-4 text-center">
-            <h1 class="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">
-                Reinventing the Viva Voce.
-            </h1>
-            <p class="text-lg md:text-xl text-indigo-100 mb-10 max-w-2xl mx-auto">
-                AInterview allows teachers to create AI-driven oral assessments. 
-                Students demonstrate their learning through conversation, not just writing.
-            </p>
-            <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <a href="teacher.html" target="_blank" class="px-8 py-4 bg-white text-indigo-600 font-bold rounded-xl shadow-lg hover:bg-gray-50 transition transform hover:-translate-y-1 flex items-center justify-center gap-2">
-                    <i class="fas fa-chalkboard-teacher"></i> I am a Teacher
-                </a>
-                <a href="student.html" target="_blank" class="px-8 py-4 bg-indigo-800 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-900 transition transform hover:-translate-y-1 flex items-center justify-center gap-2">
-                    <i class="fas fa-user-graduate"></i> I am a Student
-                </a>
-            </div>
+    <section class="py-20 text-center px-4 max-w-4xl mx-auto">
+        <h1 class="text-5xl font-extrabold text-gray-900 mb-6 tracking-tight leading-tight">
+            Oral Assessments, <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-teal-500">Reimagined.</span>
+        </h1>
+        <p class="text-xl text-gray-500 mb-10 leading-relaxed">
+            Empower your students with AI-driven oral defenses. Upload your curriculum, 
+            set the parameters, and let Prompta handle the conversation—saving you hours of interview time.
+        </p>
+        <div class="flex justify-center gap-4">
+            <a href="teacher.html" class="px-8 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                Start as Teacher
+            </a>
+            <a href="student.html" class="px-8 py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl font-semibold hover:bg-indigo-50 transition shadow-sm">
+                Join as Student
+            </a>
         </div>
-    </header>
+    </section>
 
-    <section class="py-16 max-w-6xl mx-auto px-4 flex-grow">
-        <div class="text-center mb-12">
-            <h2 class="text-3xl font-bold text-gray-900">How It Works</h2>
-            <p class="text-gray-500 mt-2">A simple workflow for authentic assessment.</p>
-        </div>
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
-                <div class="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">1</div>
-                <h3 class="text-xl font-bold mb-2">Create Assessment</h3>
-                <p class="text-gray-600 text-sm">Teachers upload a PDF template containing the "System Prompt" and interview questions.</p>
+    <section class="py-12 bg-gray-50 border-y border-gray-100 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center gap-2 mb-6">
+                <span class="h-6 w-1 bg-indigo-500 rounded-full"></span>
+                <h2 class="text-xl font-bold text-gray-900">Why Teachers Choose AInterview</h2>
             </div>
-            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
-                <div class="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">2</div>
-                <h3 class="text-xl font-bold mb-2">Student Interview</h3>
-                <p class="text-gray-600 text-sm">Students enter the code and chat with "Prompta," the AI interviewer.</p>
-            </div>
-            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
-                <div class="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">3</div>
-                <h3 class="text-xl font-bold mb-2">Review Transcripts</h3>
-                <p class="text-gray-600 text-sm">Teachers view the full transcript of every conversation in the dashboard.</p>
+            
+            <div class="flex overflow-x-auto gap-6 pb-8 hide-scrollbar snap-x snap-mandatory">
+                
+                <div class="min-w-[280px] md:min-w-[320px] bg-white p-6 rounded-2xl shadow-sm border border-gray-100 snap-center hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-4 text-2xl">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Asynchronous Review</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed">Stop scheduling back-to-back interviews during class. Review transcripts and recordings at your own pace.</p>
+                </div>
+
+                <div class="min-w-[280px] md:min-w-[320px] bg-white p-6 rounded-2xl shadow-sm border border-gray-100 snap-center hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-4 text-2xl">
+                        <i class="fas fa-microphone-lines"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Voice Verification</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed">Listen to student responses directly in the chat to verify authenticity and assess tone and fluency.</p>
+                </div>
+
+                <div class="min-w-[280px] md:min-w-[320px] bg-white p-6 rounded-2xl shadow-sm border border-gray-100 snap-center hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center text-teal-600 mb-4 text-2xl">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Downloadable Records</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed">Export full transcripts as text files or download entire class sets as a ZIP archive for your records.</p>
+                </div>
+
+                <div class="min-w-[280px] md:min-w-[320px] bg-white p-6 rounded-2xl shadow-sm border border-gray-100 snap-center hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center text-orange-600 mb-4 text-2xl">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Executive Function</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed">Set strict time limits (3-15 mins) to help students hone concise thinking and time management.</p>
+                </div>
+
+                <div class="min-w-[280px] md:min-w-[320px] bg-white p-6 rounded-2xl shadow-sm border border-gray-100 snap-center hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center text-red-600 mb-4 text-2xl">
+                        <i class="fab fa-canadian-maple-leaf"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Ontario Curriculum</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed">Optimized for "Learning for Success" assessment standards in Speaking & Listening.</p>
+                </div>
+
             </div>
         </div>
     </section>
 
-    <footer class="bg-white border-t border-gray-200 py-8 mt-12">
-        <div class="max-w-7xl mx-auto px-4 text-center text-gray-400 text-sm">
-            <button onclick="document.getElementById('changelog-modal').classList.remove('hidden')" class="text-sm text-gray-500 hover:text-indigo-600 transition underline decoration-dotted underline-offset-4">
-                What's New?
-            </button>
-            <p class="mb-2">&copy; 2026 Greenwood College School. Built by <a href="https://www.curiousit.ca/" target="_blank" rel="noopener" class="hover:text-indigo-600 transition-colors">Jonathan Tepper</a>.</p>
-            <div>
-                <span class="cursor-pointer hover:text-indigo-600 transition-colors font-medium" id="privacy-link">
-                    Privacy & Terms
-                </span>
-            </div>
+    <footer class="bg-white border-t border-gray-100 py-12 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-gray-400 text-sm">&copy; 2026 AInterview. All rights reserved.</p>
+            <p class="text-gray-300 text-xs mt-2">Privacy focused. Student data is isolated.</p>
         </div>
     </footer>
 
-    <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">Privacy & Terms of Use</h2>
-            
-            <div class="space-y-4 text-sm text-gray-600 leading-relaxed">
-                <p><strong>1. Who We Are</strong><br>
-                This tool was developed by Jonathan Tepper for use within Greenwood College School to explore AI-driven academic assessment.</p>
-
-                <p><strong>2. Open Source & Attribution</strong><br>
-                This software is provided as open-source educational software under the MIT License. Educators are free to use and modify this code, provided that original attribution to "Greenwood College School and Jonathan Tepper" remains intact.</p>
-
-                <p><strong>3. Data Privacy (Student Data)</strong><br>
-                We take your privacy seriously.
-                <ul class="list-disc pl-5 mt-1 space-y-1">
-                    <li><strong>Audio:</strong> Your voice is processed via Google Cloud purely to transcribe your answers.</li>
-                    <li><strong>Transcripts:</strong> Text logs are stored securely for your teacher to review.</li>
-                    <li><strong>AI Processing:</strong> Data sent to the AI is for the sole purpose of this assessment and is not used to train public models.</li>
-                </ul>
-                </p>
-
-                <p><strong>4. Consent</strong><br>
-                By using this tool, you consent to the recording of your voice for the specific purpose of this oral assessment.</p>
-            </div>
-
-            <div class="mt-8 flex justify-end">
-                <button id="close-privacy-btn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
-                    Close
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        document.getElementById('privacy-link').addEventListener('click', () => {
-            const modal = document.getElementById('privacy-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        });
-
-        document.getElementById('close-privacy-btn').addEventListener('click', () => {
-            const modal = document.getElementById('privacy-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        });
-
-        // Close when clicking outside the box
-        document.getElementById('privacy-modal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('privacy-modal')) {
-                const modal = document.getElementById('privacy-modal');
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }
-        });
-    </script>
     <div id="changelog-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    
-    <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" onclick="document.getElementById('changelog-modal').classList.add('hidden')"></div>
-
-    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-                
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-gray-100">
-                    <h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">
-                        <i class="fas fa-bullhorn text-indigo-500 mr-2"></i> What's New
-                    </h3>
-                    <button type="button" class="text-gray-400 hover:text-gray-500" onclick="document.getElementById('changelog-modal').classList.add('hidden')" aria-label="Close modal">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-
-                <div class="px-4 py-6 sm:px-6 max-h-[60vh] overflow-y-auto">
+        <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" onclick="document.getElementById('changelog-modal').classList.add('hidden')"></div>
+        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
                     
-                    <div class="relative pl-6 pb-6 border-l-2 border-indigo-100 last:border-0 last:pb-0">
-                        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white shadow-sm"></div>
-                        <div class="flex justify-between items-start mb-1">
-                            <h4 class="text-sm font-bold text-gray-900">Version 2.0</h4>
-                            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Jan 28, 2026</span>
-                        </div>
-                        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside marker:text-indigo-300">
-                            <li><strong>Timed Interviews:</strong> Added 3, 5, 10, and 15-minute assessment modes.</li>
-                            <li><strong>Hard Stop:</strong> Microphone now automatically closes when time expires.</li>
-                            <li><strong>Admin Console:</strong> New dashboard for managing authorized teachers.</li>
-                            <li><strong>Accessibility:</strong> Improved screen reader support and keyboard navigation.</li>
-                        </ul>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-gray-100">
+                        <h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">
+                            <i class="fas fa-bullhorn text-indigo-500 mr-2"></i> What's New
+                        </h3>
+                        <button type="button" title="Close" class="text-gray-400 hover:text-gray-500" onclick="document.getElementById('changelog-modal').classList.add('hidden')">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
                     </div>
 
-                    <div class="relative pl-6 pb-6 border-l-2 border-gray-100 last:border-0 last:pb-0">
-                        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-300 border-4 border-white"></div>
-                        <div class="flex justify-between items-start mb-1">
-                            <h4 class="text-sm font-bold text-gray-900">Version 1.5</h4>
-                            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Dec 2025</span>
+                    <div class="px-4 py-6 sm:px-6 max-h-[60vh] overflow-y-auto">
+                        
+                        <div class="relative pl-6 pb-6 border-l-2 border-indigo-100 last:border-0 last:pb-0">
+                            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white shadow-sm"></div>
+                            <div class="flex justify-between items-start mb-1">
+                                <h4 class="text-sm font-bold text-gray-900">Student Voice Recording</h4>
+                                <span class="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">Feb 2026</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-2 italic">Premium Feature</p>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside marker:text-indigo-300">
+                                <li><strong>Audio Capture:</strong> Teachers can now enable voice recording for specific interviews.</li>
+                                <li><strong>Verification:</strong> Listen to student answers directly in the transcript viewer.</li>
+                                <li><strong>Privacy First:</strong> Recordings are set to auto-expire after 9 months.</li>
+                            </ul>
                         </div>
-                        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside marker:text-gray-300">
-                            <li>Added real-time audio visualizer for students.</li>
-                            <li>Released Teacher Dashboard for PDF curriculum uploads.</li>
-                            <li>Upgraded to Gemini 2.0 Flash for faster responses.</li>
-                        </ul>
+
+                        <div class="relative pl-6 pb-6 border-l-2 border-gray-100 last:border-0 last:pb-0">
+                            <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-300 border-4 border-white"></div>
+                            <div class="flex justify-between items-start mb-1">
+                                <h4 class="text-sm font-bold text-gray-900">Version 2.0</h4>
+                                <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Jan 2026</span>
+                            </div>
+                            <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside marker:text-gray-300">
+                                <li><strong>Timed Interviews:</strong> Added 3, 5, 10, and 15-minute assessment modes.</li>
+                                <li><strong>Hard Stop:</strong> Microphone now automatically closes when time expires.</li>
+                                <li><strong>Admin Console:</strong> New dashboard for managing authorized teachers.</li>
+                            </ul>
+                        </div>
+
                     </div>
 
-                </div>
-
-                <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                    <button type="button" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto" onclick="document.getElementById('changelog-modal').classList.add('hidden')">
-                        Got it
-                    </button>
+                    <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="button" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto" onclick="document.getElementById('changelog-modal').classList.add('hidden')">
+                            Got it
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
 </body>
 </html>

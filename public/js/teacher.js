@@ -10,19 +10,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 const appId = 'default-app-id';
 let currentUser, pdfTextContent = "";
-let canRecordAudio = false; // Default permission
+let canRecordAudio = false; 
 
 // --- INITIALIZATION ---
 window.onload = initApp;
 
 function initApp() {
-    // Auth Listener
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
         updateUIForUser(user);
     });
 
-    // Attach Event Listeners
     document.getElementById('auth-btn').addEventListener('click', handleAuthButton);
     document.getElementById('create-new-btn').addEventListener('click', openCreateModal);
     document.getElementById('close-create-btn').addEventListener('click', closeCreateModal);
@@ -32,7 +30,6 @@ function initApp() {
     document.getElementById('close-submissions-btn').addEventListener('click', closeSubmissionsModal);
     document.getElementById('close-viewer-btn').addEventListener('click', closeTranscriptViewer);
 
-    // File Upload Area
     const fileInput = document.getElementById('pdf-upload');
     fileInput.addEventListener('change', (e) => handleFileSelect(e.target));
 }
@@ -45,7 +42,6 @@ async function updateUIForUser(user) {
         document.getElementById('user-display').classList.remove('hidden');
         document.getElementById('auth-btn').textContent = 'Sign Out';
         
-        // --- NEW: Check Audio Permissions ---
         try {
             const roleDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/roles`, user.email.toLowerCase()));
             if (roleDoc.exists() && roleDoc.data().canRecordAudio) {
@@ -57,7 +53,6 @@ async function updateUIForUser(user) {
             console.warn("Could not fetch permissions", e);
             canRecordAudio = false;
         }
-        // ------------------------------------
 
         setTimeout(loadInterviews, 100);
     } else {
@@ -106,12 +101,10 @@ async function loadInterviews() {
         const date = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : 'N/A';
         const safeTitle = data.title.replace(/'/g, "\\'");
         
-        // Time Limit Badge
         const timeBadge = (data.timeLimit && data.timeLimit > 0)
             ? `<span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded ml-2 border border-blue-200"><i class="far fa-clock"></i> ${data.timeLimit}m</span>`
             : `<span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded ml-2 border border-gray-200"><i class="fas fa-infinity"></i> No Limit</span>`;
 
-        // Audio Badge
         const recBadge = (data.recordAudio)
              ? `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded ml-2 border border-red-200"><i class="fas fa-microphone"></i> Rec</span>`
              : ``;
@@ -119,6 +112,9 @@ async function loadInterviews() {
         const row = document.createElement('div');
         row.className = "bg-white p-4 rounded-lg border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 hover:shadow-md transition group";
         
+        // Pass 'data.recordAudio' to the click handler
+        const recordAudioBool = data.recordAudio ? 'true' : 'false';
+
         row.innerHTML = `
             <div class="flex-1 min-w-0 text-center sm:text-left">
                 <div class="flex items-center justify-center sm:justify-start gap-2 mb-1 flex-wrap">
@@ -133,7 +129,7 @@ async function loadInterviews() {
             </div>
             
             <div class="flex items-center gap-3 opacity-100 sm:opacity-100 transition-opacity">
-                <button onclick="window.openSubmissionsList('${data.code}', '${safeTitle}')" 
+                <button onclick="window.openSubmissionsList('${data.code}', '${safeTitle}', ${recordAudioBool})" 
                     class="px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 hover:text-indigo-600 transition text-sm flex items-center gap-2">
                     <i class="fas fa-users"></i> View Submissions
                 </button>
@@ -175,7 +171,7 @@ async function saveInterview() {
     const title = document.getElementById('input-title').value;
     const fileInput = document.getElementById('pdf-upload');
     const timeSelect = document.getElementById('time-limit-select');
-    const audioToggle = document.getElementById('record-audio-toggle'); // Get element
+    const audioToggle = document.getElementById('record-audio-toggle'); 
     const file = fileInput.files[0];
 
     if (!title || !pdfTextContent || !file) {
@@ -190,12 +186,10 @@ async function saveInterview() {
     try {
         const code = generateCode();
         
-        // 1. Upload to Cloud
         const storageRef = ref(storage, `interviews/${currentUser.uid}/${code}/${file.name}`);
         const snapshot = await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(snapshot.ref);
 
-        // 2. Save Metadata
         await setDoc(doc(db, `artifacts/${appId}/public/data/interviews`, code), {
             title: title,
             curriculumText: pdfTextContent,
@@ -205,7 +199,7 @@ async function saveInterview() {
             teacherEmail: currentUser.email,
             timestamp: serverTimestamp(),
             timeLimit: parseInt(timeSelect.value) || 0,
-            recordAudio: audioToggle ? audioToggle.checked : false // Save choice
+            recordAudio: audioToggle ? audioToggle.checked : false 
         });
 
         closeCreateModal();
@@ -224,8 +218,6 @@ async function saveInterview() {
 // --- WINDOW FUNCTIONS ---
 window.openCreateModal = () => {
     document.getElementById('create-modal').classList.remove('hidden');
-    
-    // Check permission before showing toggle
     const audioContainer = document.getElementById('audio-permission-container');
     if (canRecordAudio) {
         audioContainer.classList.remove('hidden');
@@ -235,7 +227,6 @@ window.openCreateModal = () => {
     }
 };
 
-// ... (Rest of the window exports remain the same as before) ...
 window.deleteInterview = async (code) => {
     if (!confirm("Delete this interview and all student transcripts?")) return;
     try {
@@ -260,7 +251,8 @@ window.deleteInterview = async (code) => {
     }
 };
 
-window.openSubmissionsList = async (code, title) => {
+// NEW: Added recordAudio param to determine if we show the countdown
+window.openSubmissionsList = async (code, title, recordAudio = false) => {
     document.getElementById('submissions-modal').classList.remove('hidden');
     document.getElementById('submission-modal-title').textContent = title;
     document.getElementById('submission-modal-code').textContent = `Code: ${code}`;
@@ -290,22 +282,46 @@ window.openSubmissionsList = async (code, title) => {
 
         snapshot.forEach(docSnap => {
             const sub = docSnap.data();
-            const date = sub.timestamp ? new Date(sub.timestamp.toDate()).toLocaleString() : 'Unknown Date';
+            const dateObj = sub.timestamp ? sub.timestamp.toDate() : new Date();
+            const dateStr = dateObj.toLocaleString();
             const name = sub.studentName || 'Anonymous Student';
             
+            // --- NEW: Calculate Recording Expiry ---
+            let expiryBadge = '';
+            if (recordAudio) {
+                const now = new Date();
+                const diffTime = Math.abs(now - dateObj);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                const daysRemaining = 270 - diffDays;
+                
+                if (daysRemaining > 0) {
+                    expiryBadge = `<span class="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full border border-orange-200 ml-2" title="Audio auto-deletes in ${daysRemaining} days">
+                        <i class="far fa-clock"></i> T-${daysRemaining} Days
+                    </span>`;
+                } else {
+                    expiryBadge = `<span class="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full border border-gray-200 ml-2">
+                        <i class="fas fa-ban"></i> Audio Expired
+                    </span>`;
+                }
+            }
+            // ----------------------------------------
+
             const row = document.createElement('div');
             row.className = "bg-white p-4 rounded-lg border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition flex justify-between items-center group";
             
             const infoDiv = document.createElement('div');
             infoDiv.className = "flex items-center gap-4 cursor-pointer flex-1";
-            infoDiv.onclick = () => openTranscriptViewer(name, date, sub.fullTranscript);
+            infoDiv.onclick = () => openTranscriptViewer(name, dateStr, sub.fullTranscript);
             infoDiv.innerHTML = `
                 <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
                     ${name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                    <h4 class="font-bold text-gray-900 group-hover:text-indigo-600 transition">${name}</h4>
-                    <p class="text-xs text-gray-500">${date}</p>
+                    <div class="flex items-center">
+                        <h4 class="font-bold text-gray-900 group-hover:text-indigo-600 transition">${name}</h4>
+                        ${expiryBadge}
+                    </div>
+                    <p class="text-xs text-gray-500">${dateStr}</p>
                 </div>
             `;
 
@@ -315,7 +331,7 @@ window.openSubmissionsList = async (code, title) => {
             downloadBtn.innerHTML = '<i class="fas fa-download"></i>';
             downloadBtn.onclick = (e) => {
                 e.stopPropagation(); 
-                downloadSingleTranscript(sub.fullTranscript, name, date);
+                downloadSingleTranscript(sub.fullTranscript, name, dateStr);
             };
 
             row.appendChild(infoDiv);
@@ -329,19 +345,6 @@ window.openSubmissionsList = async (code, title) => {
     }
 };
 
-window.openCreateModal = () => {
-    document.getElementById('create-modal').classList.remove('hidden');
-    // Check permission logic again just in case
-    const audioContainer = document.getElementById('audio-permission-container');
-    if (canRecordAudio) {
-        audioContainer.classList.remove('hidden');
-    } else {
-        audioContainer.classList.add('hidden');
-        document.getElementById('record-audio-toggle').checked = false; 
-    }
-};
-
-// --- HELPER FUNCTIONS (Internal) ---
 function closeCreateModal() {
     document.getElementById('create-modal').classList.add('hidden');
 }
@@ -352,7 +355,6 @@ function closeTranscriptViewer() {
     document.getElementById('transcript-viewer-modal').classList.add('hidden');
 }
 
-// *New* If an audio link exists, it appends a sleek, compact audio player to the bottom of that chat bubble
 function openTranscriptViewer(name, date, transcriptArray) {
     document.getElementById('transcript-viewer-modal').classList.remove('hidden');
     document.getElementById('viewer-student-name').textContent = name;
@@ -368,31 +370,25 @@ function openTranscriptViewer(name, date, transcriptArray) {
     transcriptArray.forEach(turn => {
         const isAI = turn.role === 'model';
         
-        // 1. Setup Wrapper
         const div = document.createElement('div');
         div.className = `flex ${isAI ? 'justify-start' : 'justify-end'}`;
         
-        // 2. Setup Bubble
         const bubble = document.createElement('div');
         bubble.className = `max-w-[85%] p-4 rounded-xl text-sm leading-relaxed ${isAI ? 'bg-gray-100 text-gray-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`;
         
-        // 3. Label (Name)
         const label = document.createElement('div');
         label.className = "text-xs font-bold mb-1 opacity-70";
         label.textContent = isAI ? "Prompta" : name;
         
-        // 4. Text Content
         const text = document.createElement('div');
         text.innerHTML = turn.text.replace(/\n/g, '<br>');
         
-        // Append basics
         bubble.appendChild(label);
         bubble.appendChild(text);
 
-        // 5. NEW: Audio Player (If URL exists)
         if (turn.audioUrl) {
             const audioContainer = document.createElement('div');
-            audioContainer.className = "mt-3 pt-2 border-t border-white/20"; // Subtle separator
+            audioContainer.className = "mt-3 pt-2 border-t border-white/20"; 
             
             const audioLabel = document.createElement('div');
             audioLabel.className = "text-[10px] font-bold uppercase mb-1 opacity-75 flex items-center gap-1";
@@ -401,10 +397,8 @@ function openTranscriptViewer(name, date, transcriptArray) {
             const audioPlayer = document.createElement('audio');
             audioPlayer.controls = true;
             audioPlayer.src = turn.audioUrl;
-            // PRIVACY FEATURE: This attempts to hide the download button
             audioPlayer.setAttribute('controlsList', 'nodownload'); 
             audioPlayer.className = "w-full h-8 opacity-90 rounded";
-            // Style tweak for the player to fit the bubble theme
             audioPlayer.style.filter = isAI ? "" : "invert(1) hue-rotate(180deg)"; 
 
             audioContainer.appendChild(audioLabel);
