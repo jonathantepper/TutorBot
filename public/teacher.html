@@ -3,151 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AInterview: Teacher Dashboard</title>
-    
+    <title>Teacher Dashboard - AInterview</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-    <link rel="stylesheet" href="css/style.css">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script type="module" src="js/teacher.js?v=19"></script>
 </head>
-<body class="min-h-screen flex flex-col bg-gray-50">
+<body class="bg-gray-50 text-gray-900 font-sans">
 
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10" aria-label="Main Navigation">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
+    <div id="login-warning" class="hidden flex h-screen items-center justify-center bg-gray-50">
+        <div class="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                <i class="fas fa-lock text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2">Access Restricted</h2>
+            <p class="text-gray-500 mb-6">Please sign in to manage your interviews.</p>
+            <button id="auth-btn" class="w-full bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition">
+                Sign In with Google
+            </button>
+            <a href="index.html" class="block mt-4 text-sm text-gray-400 hover:text-indigo-600">Back to Home</a>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden min-h-screen">
+        <nav class="bg-white border-b border-gray-200 sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <i class="fas fa-chalkboard-teacher text-indigo-600 text-2xl" aria-hidden="true"></i>
-                    <h1 class="text-xl font-bold text-gray-900">AInterview <span class="text-indigo-600">Teacher</span></h1>
+                    <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">AI</div>
+                    <span class="font-bold text-xl tracking-tight">Teacher</span>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span id="user-display" class="text-sm text-gray-600 hidden" aria-live="polite"></span>
-                    <button id="auth-btn" class="text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Sign In
-                    </button>
+                    <span id="user-display" class="hidden text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full"></span>
+                    <button onclick="window.location.reload()" class="text-gray-400 hover:text-indigo-600" title="Refresh Dashboard" aria-label="Refresh Dashboard"><i class="fas fa-sync-alt"></i></button>
                 </div>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <main class="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        
-        <div id="login-warning" class="text-center mt-20">
-            <i class="fas fa-lock text-6xl text-gray-300 mb-4" aria-hidden="true"></i>
-            <h2 class="text-2xl font-bold text-gray-900">Teacher Access Only</h2>
-            <p class="text-gray-500 mt-2">Please sign in to manage interviews.</p>
-        </div>
-
-        <div id="dashboard" class="hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">Your Interviews</h2>
-                <button id="create-new-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <i class="fas fa-plus" aria-hidden="true"></i> Create New
+        <main class="max-w-7xl mx-auto px-4 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Your Interviews</h1>
+                    <p class="text-gray-500 text-sm mt-1">Manage curriculum context and student submissions.</p>
+                </div>
+                <button id="create-new-btn" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-md hover:bg-indigo-700 hover:shadow-lg transition flex items-center gap-2">
+                    <i class="fas fa-plus"></i> New Interview
                 </button>
             </div>
-            
-            <div id="interview-list" class="flex flex-col gap-3" role="list"></div>
-        </div>
-    </main>
 
-    <div id="create-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" aria-modal="true" role="dialog" aria-labelledby="create-title">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 id="create-title" class="text-xl font-bold text-gray-900">Create Assessment</h3>
-                <button id="close-create-btn" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400" aria-label="Close Modal">
-                    <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
+            <div id="interview-list" class="grid gap-4">
+                </div>
+        </main>
+    </div>
+
+    <div id="create-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-900">Create New Assessment</h3>
+                <button id="close-create-btn" class="text-gray-400 hover:text-gray-600" title="Close" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
             
-            <div class="p-6 overflow-y-auto modal-scroll">
-                <div class="space-y-5">
+            <div class="p-6 overflow-y-auto space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Interview Title</label>
+                    <input type="text" id="input-title" placeholder="e.g., Hamlet Act 3 Analysis" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Curriculum Context</label>
                     
-                    <div>
-                        <label for="input-title" class="block text-sm font-medium text-gray-700 mb-1">Assessment Title</label>
-                        <input type="text" id="input-title" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g., Hamlet Act 1">
+                    <div class="flex border-b border-gray-200 mb-3">
+                        <button id="tab-pdf" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 transition-colors focus:outline-none">
+                            <i class="fas fa-file-pdf mr-1"></i> Upload PDF
+                        </button>
+                        <button id="tab-text" class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700 transition-colors focus:outline-none">
+                            <i class="fas fa-paste mr-1"></i> Paste Text
+                        </button>
                     </div>
 
-                    <div>
-                        <label for="time-limit-select" class="block text-sm font-medium text-gray-700 mb-1">Time Limit</label>
-                        <div class="relative">
-                            <select id="time-limit-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none bg-white cursor-pointer">
-                                <option value="0">No Limit (Relaxed)</option>
-                                <option value="3">3 Minutes (Sprint)</option>
-                                <option value="5">5 Minutes (Quick Check)</option>
-                                <option value="10" selected>10 Minutes (Standard)</option>
-                                <option value="15">15 Minutes (Extended)</option>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                                <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
+                    <div id="content-pdf" class="block">
+                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 hover:border-indigo-300 transition cursor-pointer relative group">
+                            <input type="file" id="pdf-upload" accept="application/pdf" title="Upload Curriculum PDF" placeholder="Select a PDF file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <div class="pointer-events-none">
+                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2 group-hover:text-indigo-500 transition"></i>
+                                <p class="text-sm text-gray-600 font-medium">Click to upload PDF</p>
+                                <p id="file-name-display" class="text-xs text-gray-400 mt-1 truncate max-w-[200px] mx-auto">No file selected</p>
                             </div>
                         </div>
                     </div>
 
-                    <div id="audio-permission-container" class="hidden">
-                        <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition">
-                            <input type="checkbox" id="record-audio-toggle" class="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
-                            <div>
-                                <span class="block text-sm font-medium text-gray-900">Record Student Audio</span>
-                                <span class="block text-xs text-gray-500">Collect voice recordings alongside transcript.</span>
-                            </div>
-                        </label>
+                    <div id="content-text" class="hidden">
+                        <textarea id="text-paste-area" rows="6" placeholder="Paste your curriculum text here (e.g. from Google Docs, Word, or an article)..." 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm text-gray-700 leading-relaxed"></textarea>
+                        <p class="text-xs text-gray-400 mt-1 text-right">Plain text is automatically processed.</p>
                     </div>
+                </div>
 
+                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <span class="block text-sm font-medium text-gray-700 mb-1">PDF Template</span>
-                        <label id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer block w-full focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
-                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2" aria-hidden="true"></i>
-                            <p class="text-sm text-gray-500" id="file-name-display">Click to upload PDF</p>
-                            <input type="file" id="pdf-upload" accept="application/pdf" class="hidden">
-                        </label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Time Limit</label>
+                        <select id="time-limit-select" title="Select Interview Time Limit" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500">
+                            <option value="0">No Limit</option>
+                            <option value="3">3 Minutes (Quick)</option>
+                            <option value="5">5 Minutes (Standard)</option>
+                            <option value="10" selected>10 Minutes (Deep)</option>
+                            <option value="15">15 Minutes (Extended)</option>
+                        </select>
                     </div>
+                </div>
 
+                <div id="audio-permission-container" class="hidden">
+                    <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100 transition">
+                        <input type="checkbox" id="record-audio-toggle" class="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                        <div>
+                            <span class="block text-sm font-medium text-gray-900">Record Student Audio</span>
+                            <span class="block text-xs text-gray-500">Collect voice recordings alongside transcript.</span>
+                        </div>
+                    </label>
                 </div>
             </div>
 
-            <div class="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                <button id="cancel-create-btn" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400">Cancel</button>
-                <button id="save-btn" class="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Create</button>
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button id="cancel-create-btn" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button id="save-btn" class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 shadow-md transition">Create</button>
             </div>
         </div>
     </div>
 
-    <div id="submissions-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" aria-modal="true" role="dialog" aria-labelledby="submission-modal-title">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 overflow-hidden flex flex-col max-h-[85vh]">
-            <div class="p-6 border-b border-gray-100 bg-indigo-50 flex justify-between items-center">
+    <div id="submissions-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
                 <div>
-                    <h3 class="text-xl font-bold text-indigo-900" id="submission-modal-title">Submissions</h3>
-                    <p class="text-sm text-indigo-600" id="submission-modal-code">Code: ---</p>
+                    <h3 class="text-lg font-bold text-gray-900" id="submission-modal-title">Submissions</h3>
+                    <p class="text-xs text-gray-500 font-mono" id="submission-modal-code">Code: ---</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button id="download-all-btn" class="hidden px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow flex items-center gap-2 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        <i class="fas fa-file-archive" aria-hidden="true"></i> Download All (ZIP)
+                <div class="flex items-center gap-2">
+                    <button id="download-all-btn" class="hidden px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded border border-indigo-100 hover:bg-indigo-100 transition">
+                        <i class="fas fa-file-archive mr-1"></i> Download All
                     </button>
-                    <button id="close-submissions-btn" class="text-indigo-400 hover:text-indigo-700 p-2 rounded-full hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400" aria-label="Close Submissions">
-                        <i class="fas fa-times text-xl" aria-hidden="true"></i>
-                    </button>
+                    <button id="close-submissions-btn" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100" title="Close Submissions" aria-label="Close Submissions"><i class="fas fa-times"></i></button>
                 </div>
             </div>
-            <div id="submissions-list" class="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-3 modal-scroll" role="list"></div>
+            <div id="submissions-list" class="p-4 overflow-y-auto space-y-2 bg-gray-50 flex-1">
+                </div>
         </div>
     </div>
 
-    <div id="transcript-viewer-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden" aria-modal="true" role="dialog" aria-labelledby="viewer-student-name">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col h-[80vh]">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+    <div id="transcript-viewer-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-[60] p-4">
+        <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col h-[80vh] overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white z-10">
                 <div>
-                    <h4 class="font-bold text-gray-800" id="viewer-student-name">Student Name</h4>
+                    <h3 class="font-bold text-gray-900" id="viewer-student-name">Student Name</h3>
                     <p class="text-xs text-gray-500" id="viewer-date">Date</p>
                 </div>
-                <button id="close-viewer-btn" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400" aria-label="Close Viewer">
-                    <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
+                <button id="close-viewer-btn" class="text-gray-400 hover:text-gray-600" title="Close Viewer" aria-label="Close Viewer"><i class="fas fa-times text-xl"></i></button>
             </div>
-            <div id="transcript-content" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white modal-scroll" tabindex="0"></div>
+            <div id="transcript-content" class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
+                </div>
         </div>
     </div>
 
-    <script type="module" src="js/teacher.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </body>
 </html>

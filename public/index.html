@@ -10,8 +10,6 @@
         /* Hide Scrollbar */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; }
-        
-        /* Smooth scrolling behavior */
         .scroll-smooth { scroll-behavior: smooth; }
     </style>
 </head>
@@ -140,6 +138,54 @@
         </div>
     </section>
 
+    <section class="py-16 bg-gray-900 text-white relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 to-gray-900 opacity-50"></div>
+        <div class="max-w-4xl mx-auto px-4 relative z-10 text-center">
+            
+            <span class="inline-block py-1 px-3 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold tracking-wider mb-4 border border-indigo-500/30">PREMIUM FEATURE</span>
+            <h2 class="text-3xl font-bold mb-4">Capture Student Voice</h2>
+            <p class="text-gray-400 mb-8 leading-relaxed max-w-2xl mx-auto">
+                Need to verify student identity or assess fluency? Unlock the ability to record student audio alongside transcripts. 
+                <span class="text-white font-semibold">Available for free for early adopter educators.</span>
+            </p>
+
+            <div class="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm max-w-xl mx-auto text-left">
+                <form id="premium-form" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 mb-1">Name</label>
+                            <input type="text" id="p-name" title="Your Full Name" placeholder="Jane Doe" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 mb-1">School</label>
+                            <input type="text" id="p-school" title="Your School Name" placeholder="Greenwood College" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Email</label>
+                        <input type="email" id="p-email" title="Your School Email" placeholder="teacher@school.edu" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Estimated Students</label>
+                        <select id="p-students" title="Estimated Number of Students" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                            <option value="1-30">1-30 (One Class)</option>
+                            <option value="30-100">30-100 (Multiple Classes)</option>
+                            <option value="100+">100+ (Department)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1">Note (Subject/Grade/Interest)</label>
+                        <textarea id="p-note" title="Additional Information" placeholder="Grade 12 English, Hamlet assessment..." required rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition shadow-lg mt-2">
+                        Request Access
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </section>
+
     <footer class="bg-white border-t border-gray-100 py-8">
         <div class="max-w-7xl mx-auto px-4 text-center">
             <p class="text-gray-400 text-sm">&copy; 2026 AInterview. All rights reserved.</p>
@@ -199,23 +245,16 @@
         <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
             <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
                 <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
-                    
                     <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                         <h3 class="text-lg font-bold text-gray-900">Privacy & Terms of Use</h3>
-                        <button type="button" aria-label="Close legal modal" class="text-gray-400 hover:text-gray-500" onclick="document.getElementById('legal-modal').classList.add('hidden')">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
+                        <button type="button" aria-label="Close legal modal" class="text-gray-400 hover:text-gray-500" onclick="document.getElementById('legal-modal').classList.add('hidden')"><i class="fas fa-times text-xl"></i></button>
                     </div>
-
                     <div class="px-6 py-6 max-h-[70vh] overflow-y-auto space-y-6">
-                        
                         <div class="space-y-3">
                             <h4 class="text-md font-bold text-gray-800 border-b border-gray-100 pb-1">1. Who We Are</h4>
                             <p class="text-sm text-gray-600 leading-relaxed">This tool was developed by Jonathan Tepper for use within Greenwood College School to explore AI-driven academic assessment.</p>
-
                             <h4 class="text-md font-bold text-gray-800 border-b border-gray-100 pb-1 mt-4">2. Open Source & Attribution</h4>
                             <p class="text-sm text-gray-600 leading-relaxed">This software is provided as open-source educational software under the MIT License. Educators are free to use and modify this code, provided that original attribution to <strong>Greenwood College School and Jonathan Tepper</strong> remains intact.</p>
-
                             <h4 class="text-md font-bold text-gray-800 border-b border-gray-100 pb-1 mt-4">3. Data Privacy (Student Data)</h4>
                             <p class="text-sm text-gray-600 leading-relaxed">We take your privacy seriously:</p>
                             <ul class="list-disc pl-5 text-sm text-gray-600 leading-relaxed space-y-1">
@@ -223,15 +262,12 @@
                                 <li><strong>Transcripts:</strong> Text logs are stored securely for your teacher to review.</li>
                                 <li><strong>AI Processing:</strong> Data sent to the AI is for the sole purpose of this assessment and is not used to train public models.</li>
                             </ul>
-
                             <h4 class="text-md font-bold text-gray-800 border-b border-gray-100 pb-1 mt-4">4. Consent</h4>
                             <p class="text-sm text-gray-600 leading-relaxed">By using this tool, you consent to the recording of your voice for the specific purpose of this oral assessment.</p>
                         </div>
-
                         <div class="mt-8 pt-6 border-t border-gray-200">
                             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Full MIT License</h4>
-                            <pre class="whitespace-pre-wrap font-mono text-[10px] text-gray-500 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100">
-MIT License
+                            <pre class="whitespace-pre-wrap font-mono text-[10px] text-gray-500 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100">MIT License
 
 Copyright (c) 2026 Greenwood College School & Jonathan Tepper
 
@@ -251,16 +287,11 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-                            </pre>
+SOFTWARE.</pre>
                         </div>
-
                     </div>
-
                     <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                        <button type="button" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto" onclick="document.getElementById('legal-modal').classList.add('hidden')">
-                            Close
-                        </button>
+                        <button type="button" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto" onclick="document.getElementById('legal-modal').classList.add('hidden')">Close</button>
                     </div>
                 </div>
             </div>
@@ -268,11 +299,11 @@ SOFTWARE.
     </div>
 
     <script>
+        // --- AUTO SCROLL ---
         const scrollContainer = document.getElementById('features-scroll');
         const scrollInterval = 8000; 
         const cardWidth = 260 + 16; 
         let autoScroll;
-
         function startAutoScroll() {
             autoScroll = setInterval(() => {
                 if (scrollContainer.scrollLeft + scrollContainer.clientWidth >= scrollContainer.scrollWidth - 10) {
@@ -282,15 +313,39 @@ SOFTWARE.
                 }
             }, scrollInterval);
         }
-
-        function stopAutoScroll() {
-            clearInterval(autoScroll);
-        }
-
+        function stopAutoScroll() { clearInterval(autoScroll); }
         startAutoScroll();
         scrollContainer.addEventListener('mouseenter', stopAutoScroll);
         scrollContainer.addEventListener('mouseleave', startAutoScroll);
         scrollContainer.addEventListener('touchstart', stopAutoScroll);
+
+        // --- PREMIUM FORM EMAIL LOGIC (UPDATED) ---
+        document.getElementById('premium-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('p-name').value;
+            const school = document.getElementById('p-school').value;
+            const email = document.getElementById('p-email').value;
+            const students = document.getElementById('p-students').value;
+            const note = document.getElementById('p-note').value;
+
+            // Use encodeURIComponent for safer formatting
+            const subject = encodeURIComponent(`AInterview Premium Request: ${school}`);
+            const bodyContent = `Name: ${name}\nSchool: ${school}\nEmail: ${email}\nStudents: ${students}\n\nNote:\n${note}`;
+            const body = encodeURIComponent(bodyContent);
+
+            // Force window location change
+            const mailtoLink = `mailto:jontepper+ainterview@gmail.com?subject=${subject}&body=${body}`;
+            
+            // Try opening
+            window.location.href = mailtoLink;
+            
+            // Visual feedback
+            const btn = e.target.querySelector('button');
+            const originalText = btn.innerText;
+            btn.innerText = "Opening Email Client...";
+            setTimeout(() => btn.innerText = originalText, 3000);
+        });
     </script>
 
 </body>
