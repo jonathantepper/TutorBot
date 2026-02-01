@@ -15,6 +15,7 @@ const OWNER_EMAIL = "jontepper@gmail.com";
 // --- GLOBAL STATE ---
 let currentUserRole = null; // 'admin', 'manager', or null
 let currentUserDomain = null;
+let discoveredTeachers = []; // Teachers found in interviews but not in roles
 
 // --- INITIALIZATION ---
 window.onload = initApp;
@@ -150,6 +151,8 @@ async function loadAuthorizedUsers() {
     try {
         const q = query(collection(db, `artifacts/${appId}/public/data/roles`));
         const snapshot = await getDocs(q);
+        const authorizedEmails = snapshot.docs.map(d => d.id.toLowerCase());
+        renderDiscoveredTeachers(authorizedEmails);
         
         listEl.innerHTML = '';
         
@@ -305,7 +308,7 @@ async function loadData() {
             }
 
             const interviewTimestamp = data.timestamp ? data.timestamp.toDate() : null;
- 
+
             if (!teachers[tid]) {
                 teachers[tid] = { 
                     id: tid, 
@@ -327,7 +330,17 @@ async function loadData() {
             teachers[tid].interviews.push({ id: docSnap.id, ...data });
         });
 
+        // 1. Render the main dashboard UI
         renderTeachersByDomain(teachers);
+
+        // 2. NEW: Save unique emails for the Discovery list in the modal
+        // This converts our teacher objects into a simple list of emails and names
+        discoveredTeachers = Object.values(teachers).map(t => ({
+            email: t.email.toLowerCase(),
+            name: t.name
+        }));
+
+        console.log(`[Discovery] Found ${discoveredTeachers.length} unique teachers in the system.`);
 
     } catch (e) {
         console.error("Error loading data:", e);
@@ -446,6 +459,47 @@ function renderTeachersByDomain(teachersMap) {
         });
     });
 }
+
+async function renderDiscoveredTeachers(authorizedEmails) {
+    const listEl = document.getElementById('discovered-teachers-list');
+    listEl.innerHTML = '';
+
+    // Filter discovered list to only show people NOT already authorized
+    const pending = discoveredTeachers.filter(t => 
+        !authorizedEmails.includes(t.email.toLowerCase()) && 
+        t.email !== "no-email-recorded"
+    );
+
+    if (pending.length === 0) {
+        listEl.innerHTML = '<p class="text-xs text-gray-400 italic p-3 bg-gray-50 rounded-lg">No new teachers discovered.</p>';
+        return;
+    }
+
+    pending.forEach(teacher => {
+        const row = document.createElement('div');
+        row.className = "flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-200 border-dashed";
+        row.innerHTML = `
+            <div class="flex flex-col">
+                <span class="text-sm font-bold text-gray-700">${teacher.name}</span>
+                <span class="text-[10px] text-gray-500">${teacher.email}</span>
+            </div>
+            <button onclick="quickAuthorize('${teacher.email}')" class="text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg transition font-medium">
+                Authorize
+            </button>
+        `;
+        listEl.appendChild(row);
+    });
+}
+
+// Global helper for the button
+window.quickAuthorize = (email) => {
+    document.getElementById('new-user-email').value = email;
+    document.getElementById('new-user-role').value = 'manager';
+    document.getElementById('new-user-email').scrollIntoView({ behavior: 'smooth' });
+    // Visual feedback
+    document.getElementById('new-user-email').classList.add('ring-2', 'ring-indigo-500');
+    setTimeout(() => document.getElementById('new-user-email').classList.remove('ring-2', 'ring-indigo-500'), 2000);
+};
 
 // --- ACTIONS (Unchanged) ---
 // 1. View List of Students (Now with "Read Chat" button)
