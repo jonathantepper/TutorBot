@@ -3,6 +3,10 @@ const admin = require("firebase-admin");
 const textToSpeech = require("@google-cloud/text-to-speech");
 const {GoogleGenerativeAI} = require("@google/generative-ai");
 const path = require("path");
+const {
+  RecaptchaEnterpriseServiceClient,
+} = require("@google-cloud/recaptcha-enterprise");
+const nodemailer = require("nodemailer");
 
 // --- FIX 1: Explicitly define the bucket here ---
 admin.initializeApp({
@@ -20,7 +24,7 @@ if (process.env.FUNCTIONS_EMULATOR === "true") {
 
 const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 
-// --- NEW SECURE AI FUNCTION (Replaces getGeminiToken) ---
+// --- NEW SECURE AI FUNCTION ---
 exports.getGeminiResponse = onRequest(
     {
       cors: [
@@ -46,14 +50,12 @@ exports.getGeminiResponse = onRequest(
           throw new Error("Server is missing Gemini API Key");
         }
 
-        // Initialize Gemini on the server side
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
           model: "gemini-2.0-flash",
           systemInstruction: systemPrompt,
         });
 
-        // Convert the history format if needed, or pass directly
         const chat = model.startChat({history: history || []});
         const result = await chat.sendMessage(message);
         const responseText = result.response.text();
@@ -66,6 +68,7 @@ exports.getGeminiResponse = onRequest(
     },
 );
 
+// --- DELETE INTERVIEW FUNCTION ---
 exports.deleteInterviewAndTranscripts = onRequest(
     {
       cors: [
@@ -101,7 +104,6 @@ exports.deleteInterviewAndTranscripts = onRequest(
             .doc(interviewId);
         const interviewDoc = await interviewDocRef.get();
 
-        // --- ORPHAN CLEANUP LOGIC ---
         if (interviewDoc.exists) {
           if (interviewDoc.data().teacherId !== teacherId) {
             res.status(403).json({
@@ -110,7 +112,6 @@ exports.deleteInterviewAndTranscripts = onRequest(
             return;
           }
 
-          // 1. DELETE TRANSCRIPTS
           const transcriptsQuery = db.collection(transcriptPublicCollectionPath)
               .where("interviewCode", "==", interviewId);
           const transcriptSnapshot = await transcriptsQuery.get();
@@ -120,32 +121,16 @@ exports.deleteInterviewAndTranscripts = onRequest(
             batch.delete(doc.ref);
           });
 
-          // 2. DELETE INTERVIEW DOC
           batch.delete(interviewDocRef);
           await batch.commit();
-          console.log(`[Database] Deleted records for ${interviewId}`);
-        } else {
-          console.log(
-              `[Database] Doc ${interviewId} not found. ` +
-            `Proceeding to clean orphans.`,
-          );
         }
 
-        // 3. DELETE CLOUD STORAGE FILES (PDF)
         const bucket = storage.bucket();
         const folderPath = `interviews/${teacherId}/${interviewId}/`;
-
-        console.log(`[Cleaner] Checking bucket: ${bucket.name}`);
-        console.log(`[Cleaner] Deleting prefix: ${folderPath}`);
 
         await bucket.deleteFiles({
           prefix: folderPath,
         });
-
-        console.log(
-            `Deleted interview ${interviewId}, transcripts, and ` +
-          `files for teacher ${teacherId}.`,
-        );
 
         res.status(200).json({
           success: true,
@@ -160,6 +145,7 @@ exports.deleteInterviewAndTranscripts = onRequest(
     },
 );
 
+// --- GENERATE SPEECH FUNCTION ---
 exports.generateSpeech = onRequest(
     {
       region: "us-central1",
@@ -195,6 +181,74 @@ exports.generateSpeech = onRequest(
       } catch (error) {
         console.error("TTS Error:", error);
         res.status(500).send(error.message);
+      }
+    },
+);
+
+// --- NEW ACCESS REQUEST FUNCTION (WITH RECAPTCHA) ---
+exports.sendAccessRequest = onRequest(
+    {
+      region: "us-central1",
+      cors: [
+        "https://ainterview.curiousit.ca",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+      ],
+      secrets: ["GMAIL_APP_PASSWORD"],
+    },
+    async (req, res) => {
+      if (req.method !== "POST") {
+        return res.status(405).send("Method Not Allowed");
+      }
+
+      try {
+        const {name, school, email, students, note, recaptchaToken} = req.body;
+
+        // 1. Verify reCAPTCHA Token
+        const client = new RecaptchaEnterpriseServiceClient();
+        const projectPath = client.projectPath("tutorbot-184ec");
+        const [assessment] = await client.createAssessment({
+          assessment: {
+            event: {
+              token: recaptchaToken,
+              siteKey: "6LfuQUgsAAAAAA7yi-9EYCWV8lp_VC10G0dzJ1LO",
+            },
+          },
+          parent: projectPath,
+        });
+
+        // 0.5 is the standard threshold. Lower is more bot-like.
+        if (assessment.riskAnalysis.score < 0.5) {
+          console.warn("Spam prevented. Score:", assessment.riskAnalysis.score);
+          return res.status(403).json({error: "Bot activity detected."});
+        }
+
+        // 2. Setup Nodemailer
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: "jontepper+ainterview@gmail.com",
+            pass: process.env.GMAIL_APP_PASSWORD,
+          },
+        });
+
+        // 3. Send Email
+        await transporter.sendMail({
+          from: "AInterview Form <jontepper+ainterview@gmail.com>",
+          to: "jontepper+ainterview@gmail.com",
+          subject: `Access Request: ${school}`,
+          text: `Name: ${name}\n` +
+                `School: ${school}\n` +
+                `Email: ${email}\n` +
+                `Students: ${students}\n\n` +
+                `Note:\n${note}\n\n` +
+                `(Human Score: ${assessment.riskAnalysis.score})`,
+        });
+
+        res.status(200).json({success: true});
+      } catch (error) {
+        console.error("Access Request Error:", error);
+        res.status(500).send("An internal error occurred.");
       }
     },
 );
